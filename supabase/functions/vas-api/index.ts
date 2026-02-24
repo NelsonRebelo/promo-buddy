@@ -3,29 +3,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-  "Access-Control-Allow-Credentials": "true",
+    "authorization, x-client-info, apikey, content-type, x-vas-session, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
+function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-function getSessionIdFromCookie(req: Request): string | null {
-  const cookie = req.headers.get("cookie") || "";
-  const match = cookie.match(/vas_session=([^;]+)/);
-  return match ? match[1] : null;
-}
-
-function sessionCookie(sessionId: string, maxAge = 43200) {
-  return `vas_session=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
-}
-
-function clearCookie() {
-  return `vas_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`;
+function getSessionId(req: Request): string | null {
+  return req.headers.get("x-vas-session") || null;
 }
 
 const supabaseAdmin = createClient(
@@ -57,7 +46,6 @@ Deno.serve(async (req) => {
         return json({ ok: false, error: "Server misconfigured" }, 500);
       }
 
-      // Call upstream OAuth
       const params = new URLSearchParams({
         grant_type: "password",
         username,
@@ -73,11 +61,8 @@ Deno.serve(async (req) => {
       });
 
       if (!oauthRes.ok) {
-        const errorText = await oauthRes.text();
-        return json(
-          { ok: false, error: `Authentication failed: ${oauthRes.status}` },
-          401
-        );
+        await oauthRes.text();
+        return json({ ok: false, error: `Authentication failed: ${oauthRes.status}` }, 401);
       }
 
       const oauthData = await oauthRes.json();
@@ -88,12 +73,10 @@ Deno.serve(async (req) => {
       }
 
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000); // 12 hours
+      const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000);
 
-      // Clean up expired sessions first
       await supabaseAdmin.rpc("cleanup_expired_sessions");
 
-      // Insert session
       const { data: session, error: insertError } = await supabaseAdmin
         .from("sessions")
         .insert({
@@ -109,16 +92,12 @@ Deno.serve(async (req) => {
         return json({ ok: false, error: "Failed to create session" }, 500);
       }
 
-      return json(
-        { ok: true, token_expires_at: session.token_expires_at },
-        200,
-        { "Set-Cookie": sessionCookie(session.session_id) }
-      );
+      return json({ ok: true, session_id: session.session_id, token_expires_at: session.token_expires_at });
     }
 
     // ─── GET /status ───
     if (path === "/status" && req.method === "GET") {
-      const sessionId = getSessionIdFromCookie(req);
+      const sessionId = getSessionId(req);
       if (!sessionId) {
         return json({ loggedIn: false });
       }
@@ -136,7 +115,7 @@ Deno.serve(async (req) => {
       const expired = new Date(data.token_expires_at) < new Date();
       if (expired) {
         await supabaseAdmin.from("sessions").delete().eq("session_id", sessionId);
-        return json({ loggedIn: false }, 200, { "Set-Cookie": clearCookie() });
+        return json({ loggedIn: false });
       }
 
       return json({ loggedIn: true, token_expires_at: data.token_expires_at });
@@ -144,16 +123,16 @@ Deno.serve(async (req) => {
 
     // ─── POST /logout ───
     if (path === "/logout" && req.method === "POST") {
-      const sessionId = getSessionIdFromCookie(req);
+      const sessionId = getSessionId(req);
       if (sessionId) {
         await supabaseAdmin.from("sessions").delete().eq("session_id", sessionId);
       }
-      return json({ ok: true }, 200, { "Set-Cookie": clearCookie() });
+      return json({ ok: true });
     }
 
     // ─── POST /vas/send ───
     if (path === "/vas/send" && req.method === "POST") {
-      const sessionId = getSessionIdFromCookie(req);
+      const sessionId = getSessionId(req);
       if (!sessionId) {
         return json({ success: false, errorMessage: "Not authenticated" }, 401);
       }
@@ -170,19 +149,12 @@ Deno.serve(async (req) => {
 
       if (new Date(session.token_expires_at) < new Date()) {
         await supabaseAdmin.from("sessions").delete().eq("session_id", sessionId);
-        return json(
-          { success: false, errorMessage: "Session expired" },
-          401,
-          { "Set-Cookie": clearCookie() }
-        );
+        return json({ success: false, errorMessage: "Session expired" }, 401);
       }
 
       const { advert, promotion } = await req.json();
       if (!advert || !promotion) {
-        return json(
-          { success: false, advert, promotion, status: 400, errorMessage: "Missing advert or promotion" },
-          400
-        );
+        return json({ success: false, advert, promotion, status: 400, errorMessage: "Missing advert or promotion" }, 400);
       }
 
       try {
