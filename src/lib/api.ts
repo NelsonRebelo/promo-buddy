@@ -12,12 +12,7 @@ async function request(path: string, options: RequestInit = {}) {
   return res;
 }
 
-export async function login(data: {
-  base_url: string;
-  client_id: string;
-  username: string;
-  password: string;
-}) {
+export async function login(data: { username: string; password: string }) {
   const res = await request("/login", {
     method: "POST",
     body: JSON.stringify(data),
