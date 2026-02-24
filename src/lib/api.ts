@@ -1,13 +1,30 @@
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vas-api`;
+const SESSION_KEY = "vas_session_id";
+
+function getSessionId(): string | null {
+  return localStorage.getItem(SESSION_KEY);
+}
+
+function setSessionId(id: string) {
+  localStorage.setItem(SESSION_KEY, id);
+}
+
+function clearSessionId() {
+  localStorage.removeItem(SESSION_KEY);
+}
 
 async function request(path: string, options: RequestInit = {}) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  const sessionId = getSessionId();
+  if (sessionId) {
+    headers["x-vas-session"] = sessionId;
+  }
   const res = await fetch(`${FUNCTION_URL}${path}`, {
     ...options,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
   });
   return res;
 }
@@ -17,11 +34,16 @@ export async function login(data: { username: string; password: string }) {
     method: "POST",
     body: JSON.stringify(data),
   });
-  return res.json();
+  const json = await res.json();
+  if (json.ok && json.session_id) {
+    setSessionId(json.session_id);
+  }
+  return json;
 }
 
 export async function logout() {
   const res = await request("/logout", { method: "POST" });
+  clearSessionId();
   return res.json();
 }
 
