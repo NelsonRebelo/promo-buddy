@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Credentials": "true",
 };
 
@@ -44,14 +44,16 @@ Deno.serve(async (req) => {
   try {
     // ─── POST /login ───
     if (path === "/login" && req.method === "POST") {
-      const { base_url, client_id, username, password } = await req.json();
+      const { username, password } = await req.json();
 
-      if (!base_url || !client_id || !username || !password) {
+      if (!username || !password) {
         return json({ ok: false, error: "Missing required fields" }, 400);
       }
 
       const clientSecret = Deno.env.get("CLIENT_SECRET");
-      if (!clientSecret) {
+      const clientId = Deno.env.get("VAS_CLIENT_ID");
+      const baseUrl = Deno.env.get("VAS_BASE_URL");
+      if (!clientSecret || !clientId || !baseUrl) {
         return json({ ok: false, error: "Server misconfigured" }, 500);
       }
 
@@ -60,11 +62,11 @@ Deno.serve(async (req) => {
         grant_type: "password",
         username,
         password,
-        client_id,
+        client_id: clientId,
         client_secret: clientSecret,
       });
 
-      const oauthRes = await fetch(`${base_url}/oauth/token/`, {
+      const oauthRes = await fetch(`${baseUrl}/oauth/token/`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: params.toString(),
@@ -96,7 +98,7 @@ Deno.serve(async (req) => {
         .from("sessions")
         .insert({
           access_token: accessToken,
-          base_url,
+          base_url: baseUrl,
           token_acquired_at: now.toISOString(),
           token_expires_at: expiresAt.toISOString(),
         })

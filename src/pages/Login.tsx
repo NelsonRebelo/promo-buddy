@@ -10,7 +10,7 @@ import { login, getStatus } from "@/lib/api";
 
 const Login = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ base_url: "", client_id: "", username: "", password: "" });
+  const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
@@ -62,16 +62,6 @@ const Login = () => {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="base_url">Base URL</Label>
-              <Input id="base_url" placeholder="https://api.example.com" value={form.base_url}
-                onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="client_id">Client ID</Label>
-              <Input id="client_id" value={form.client_id}
-                onChange={(e) => setForm((f) => ({ ...f, client_id: e.target.value }))} required />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
               <Input id="username" value={form.username}
