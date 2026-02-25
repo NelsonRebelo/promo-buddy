@@ -54,15 +54,21 @@ Deno.serve(async (req) => {
         client_secret: clientSecret,
       });
 
-      const oauthRes = await fetch(`${baseUrl}/oauth/token/`, {
+      const oauthUrl = `${baseUrl}/oauth/token/`;
+      console.log("OAuth URL:", oauthUrl);
+      console.log("Client ID:", clientId);
+      console.log("Grant type: password, username:", username);
+
+      const oauthRes = await fetch(oauthUrl, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: params.toString(),
       });
 
       if (!oauthRes.ok) {
-        await oauthRes.text();
-        return json({ ok: false, error: `Authentication failed: ${oauthRes.status}` }, 401);
+        const errText = await oauthRes.text();
+        console.log("OAuth error response:", oauthRes.status, errText);
+        return json({ ok: false, error: `Authentication failed: ${oauthRes.status}`, detail: errText.substring(0, 500) }, 401);
       }
 
       const oauthData = await oauthRes.json();
