@@ -29,17 +29,6 @@ function parseFormToken(html: string): string | null {
   return null;
 }
 
-function getSetCookieValues(headers: Headers): string[] {
-  const denoHeaders = headers as Headers & { getSetCookie?: () => string[] };
-  if (typeof denoHeaders.getSetCookie === "function") {
-    return denoHeaders.getSetCookie();
-  }
-
-  const raw = headers.get("set-cookie");
-  if (!raw) return [];
-  return [raw];
-}
-
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -79,14 +68,9 @@ Deno.serve(async (req) => {
       const html = await response.text();
       const formToken = parseFormToken(html);
 
-      const cookies = getSetCookieValues(response.headers)
-        .map((cookie) => cookie.split(";")[0])
-        .filter(Boolean);
-
       return json({
         ok: true,
         formToken,
-        cookie: cookies.join("; ") || null,
       });
     }
 

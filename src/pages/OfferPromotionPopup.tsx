@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 type OfferTokenInfo = {
   ok: boolean;
   formToken?: string | null;
-  cookie?: string | null;
   error?: string;
   detail?: string;
 };
@@ -49,7 +48,6 @@ const OfferPromotionPopup = () => {
               type: "offer-token-info",
               payload: {
                 formToken: data.formToken ?? null,
-                cookie: data.cookie ?? null,
               },
             },
             window.location.origin,
@@ -80,22 +78,22 @@ const OfferPromotionPopup = () => {
         </Button>
       </div>
       <div className="flex items-center justify-center">
-      <div className="glass w-full max-w-md rounded-3xl border-white/80 p-6 text-center">
-        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Loader2 className="h-5 w-5 animate-spin" />
+        <div className="glass w-full max-w-md rounded-3xl border-white/80 p-6 text-center">
+          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Offer Promotion</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{error || status}</p>
+          {error && (
+            <button
+              type="button"
+              className="mt-4 rounded-lg border border-white/80 bg-white/75 px-4 py-2 text-sm"
+              onClick={() => window.close()}
+            >
+              Close
+            </button>
+          )}
         </div>
-        <h1 className="text-xl font-semibold tracking-tight">Offer Promotion</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error || status}</p>
-        {error && (
-          <button
-            type="button"
-            className="mt-4 rounded-lg border border-white/80 bg-white/75 px-4 py-2 text-sm"
-            onClick={() => window.close()}
-          >
-            Close
-          </button>
-        )}
-      </div>
       </div>
     </div>
   );

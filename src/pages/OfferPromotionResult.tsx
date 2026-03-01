@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 
 type OfferTokenInfo = {
   formToken: string | null;
-  cookie: string | null;
 };
 
 const STORAGE_KEY = "offer_token_info";
@@ -48,22 +47,13 @@ const OfferPromotionResult = () => {
       <main className="section-shell flex min-h-[calc(100vh-3.5rem)] items-center justify-center py-10 sm:py-16">
         <div className="glass w-full max-w-3xl rounded-3xl border-white/80 p-6 sm:p-8">
           <h1 className="text-2xl font-semibold tracking-tight">Offer Promotion Token Info</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Debug values retrieved from backend flow.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Token value retrieved from adminpanel flow.</p>
 
-          <div className="mt-6 space-y-4">
-            <div className="rounded-2xl border border-white/80 bg-white/75 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">formToken</p>
-              <pre className="mt-2 whitespace-pre-wrap break-all text-sm text-foreground">
-                {data?.formToken || "(not available)"}
-              </pre>
-            </div>
-
-            <div className="rounded-2xl border border-white/80 bg-white/75 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">cookie</p>
-              <pre className="mt-2 whitespace-pre-wrap break-all text-sm text-foreground">
-                {data?.cookie || "(not available)"}
-              </pre>
-            </div>
+          <div className="mt-6 rounded-2xl border border-white/80 bg-white/75 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">formToken</p>
+            <pre className="mt-2 whitespace-pre-wrap break-all text-sm text-foreground">
+              {data?.formToken || "(not available)"}
+            </pre>
           </div>
         </div>
       </main>
