@@ -17,6 +17,24 @@ function getSessionId(req: Request): string | null {
   return req.headers.get("x-vas-session") || null;
 }
 
+function parseFormToken(html: string): string | null {
+  const match =
+    html.match(/name=["']formToken["'][^>]*value=["']([^"']+)["']/i) ||
+    html.match(/value=["']([^"']+)["'][^>]*name=["']formToken["']/i);
+  return match?.[1] || null;
+}
+
+function getSetCookieValues(headers: Headers): string[] {
+  const denoHeaders = headers as Headers & { getSetCookie?: () => string[] };
+  if (typeof denoHeaders.getSetCookie === "function") {
+    return denoHeaders.getSetCookie();
+  }
+
+  const raw = headers.get("set-cookie");
+  if (!raw) return [];
+  return [raw];
+}
+
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -31,6 +49,42 @@ Deno.serve(async (req) => {
   const path = url.pathname.replace(/^\/vas-api/, "");
 
   try {
+    if (path === "/offer/token-info" && req.method === "GET") {
+      const loginUrl = "https://www.standvirtual.com/adminpanel/login/";
+      const response = await fetch(loginUrl, {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 PromoBuddy/1.0",
+          Accept: "text/html,application/xhtml+xml",
+        },
+      });
+
+      if (!response.ok) {
+        const detail = await response.text();
+        return json(
+          {
+            ok: false,
+            error: `Failed to load offer login page: ${response.status}`,
+            detail: detail.substring(0, 500),
+          },
+          502,
+        );
+      }
+
+      const html = await response.text();
+      const formToken = parseFormToken(html);
+
+      const cookies = getSetCookieValues(response.headers)
+        .map((cookie) => cookie.split(";")[0])
+        .filter(Boolean);
+
+      return json({
+        ok: true,
+        formToken,
+        cookie: cookies.join("; ") || null,
+      });
+    }
+
     // ─── POST /login ───
     if (path === "/login" && req.method === "POST") {
       const { username, password } = await req.json();
@@ -198,13 +252,13 @@ Deno.serve(async (req) => {
           advert,
           promotion,
           status: "network error",
-          errorMessage: err.message || "Network error",
+          errorMessage: err instanceof Error ? err.message : "Network error",
         });
       }
     }
 
     return json({ error: "Not found" }, 404);
   } catch (err) {
-    return json({ error: "Internal server error" }, 500);
+    return json({ error: "Internal server error", detail: err instanceof Error ? err.message : String(err) }, 500);
   }
 });

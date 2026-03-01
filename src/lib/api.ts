@@ -59,3 +59,8 @@ export async function sendVas(advert: string, promotion: string) {
   });
   return { status: res.status, data: await res.json() };
 }
+
+export async function getOfferTokenInfo() {
+  const res = await request("/offer/token-info", { method: "GET" });
+  return res.json();
+}

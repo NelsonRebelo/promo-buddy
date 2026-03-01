@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Runner from "./pages/Runner";
+import OfferPromotionPopup from "./pages/OfferPromotionPopup";
+import OfferPromotionResult from "./pages/OfferPromotionResult";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +22,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/runner" element={<Runner />} />
+          <Route path="/offer-promotion-popup" element={<OfferPromotionPopup />} />
+          <Route path="/offer-promotion-debug" element={<OfferPromotionResult />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

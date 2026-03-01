@@ -1,13 +1,31 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+const STORAGE_KEY = "offer_token_info";
+
 const Index = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "offer-token-info") return;
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(event.data.payload));
+      navigate("/offer-promotion-debug");
+    };
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [navigate]);
+
   const openOfferLoginPopup = () => {
     window.open(
-      "https://www.standvirtual.com/adminpanel/login/",
+      "/offer-promotion-popup",
       "offer-promotion-login",
-      "popup=yes,width=560,height=760,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes",
+      "popup=yes,width=560,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes",
     );
   };
 
