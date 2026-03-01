@@ -21,8 +21,10 @@ const Index = () => {
             <Button asChild className="h-12 rounded-xl text-sm font-medium shadow-sm">
               <Link to="/login">Investment promotion</Link>
             </Button>
-            <Button type="button" variant="outline" className="h-12 rounded-xl border-white/80 bg-white/70 text-sm">
-              Offer Promotion
+            <Button asChild type="button" variant="outline" className="h-12 rounded-xl border-white/80 bg-white/70 text-sm">
+              <a href="https://www.standvirtual.com/adminpanel/login/" target="_blank" rel="noreferrer">
+                Offer Promotion
+              </a>
             </Button>
           </CardContent>
         </Card>
