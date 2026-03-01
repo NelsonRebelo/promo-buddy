@@ -14,10 +14,15 @@ function clearSessionId() {
 }
 
 async function request(path: string, options: RequestInit = {}) {
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
+  if (supabaseKey) {
+    headers.apikey = supabaseKey;
+    headers.Authorization = `Bearer ${supabaseKey}`;
+  }
   const sessionId = getSessionId();
   if (sessionId) {
     headers["x-vas-session"] = sessionId;
