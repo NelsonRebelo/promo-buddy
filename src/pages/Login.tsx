@@ -8,6 +8,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Loader2, LockKeyhole } from "lucide-react";
 import { login, getStatus } from "@/lib/api";
 
+function mapLoginError(error?: string): string {
+  if (!error) return "Login failed";
+  if (error.includes("Authentication failed: 400")) {
+    return "Incorrect username or password. Reset your Standvirtual password if your forgot it.";
+  }
+  return error;
+}
+
 const Login = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
@@ -40,7 +48,7 @@ const Login = () => {
       if (res.ok) {
         navigate("/runner", { replace: true });
       } else {
-        setError(res.error || "Login failed");
+        setError(mapLoginError(res.error));
       }
     } catch {
       setError("Network error. Please try again.");
