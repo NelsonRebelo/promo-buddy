@@ -394,6 +394,7 @@ const Runner = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2">
                     <div className="p-3">
+                      <div className="rounded-lg border border-slate-200 bg-white/95 p-2">
                       <Label htmlFor="manual-advert" className="sr-only">
                         Advert IDs
                       </Label>
@@ -405,44 +406,47 @@ const Runner = () => {
                         disabled={running}
                         className="min-h-32 rounded-lg border-white/80 bg-white"
                       />
+                      </div>
                     </div>
 
                     <div className="border-t border-white/80 p-3 sm:border-l sm:border-t-0">
-                      <div className="mb-2 flex items-center gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 rounded-full px-3 text-xs"
-                          onClick={() => setManualPromotionIds(PROMOTION_OPTIONS.map((option) => option.id))}
-                          disabled={running}
-                        >
-                          Select all
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 rounded-full px-3 text-xs"
-                          onClick={() => setManualPromotionIds([])}
-                          disabled={running}
-                        >
-                          Clear
-                        </Button>
-                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white/95 p-2">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 rounded-full px-3 text-xs"
+                            onClick={() => setManualPromotionIds(PROMOTION_OPTIONS.map((option) => option.id))}
+                            disabled={running}
+                          >
+                            Select all
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 rounded-full px-3 text-xs"
+                            onClick={() => setManualPromotionIds([])}
+                            disabled={running}
+                          >
+                            Clear
+                          </Button>
+                        </div>
 
-                      <div className="max-h-36 space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
-                        {PROMOTION_OPTIONS.map((option) => (
-                          <label key={option.id} className="flex cursor-pointer items-center gap-2 px-1 py-0.5 text-sm">
-                            <Checkbox
-                              checked={manualPromotionIds.includes(option.id)}
-                              onCheckedChange={(checked) => togglePromotion(option.id, checked === true)}
-                              disabled={running}
-                            />
-                            <span>{option.name}</span>
-                            <span className="text-xs text-muted-foreground">({option.id})</span>
-                          </label>
-                        ))}
+                        <div className="max-h-36 space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
+                          {PROMOTION_OPTIONS.map((option) => (
+                            <label key={option.id} className="flex cursor-pointer items-center gap-2 px-1 py-0.5 text-sm">
+                              <Checkbox
+                                checked={manualPromotionIds.includes(option.id)}
+                                onCheckedChange={(checked) => togglePromotion(option.id, checked === true)}
+                                disabled={running}
+                              />
+                              <span>{option.name}</span>
+                              <span className="text-xs text-muted-foreground">({option.id})</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
