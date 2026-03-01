@@ -11,7 +11,7 @@ import { login, getStatus } from "@/lib/api";
 function mapLoginError(error?: string): string {
   if (!error) return "Login failed";
   if (error.includes("Authentication failed: 400")) {
-    return "Incorrect username or password. Reset your Standvirtual password if your forgot it.";
+    return "Incorrect username or password. Reset your Standvirtual password if you forgot it.";
   }
   return error;
 }
