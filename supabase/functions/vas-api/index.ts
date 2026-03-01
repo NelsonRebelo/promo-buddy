@@ -18,10 +18,15 @@ function getSessionId(req: Request): string | null {
 }
 
 function parseFormToken(html: string): string | null {
-  const match =
+  const inputMatch =
     html.match(/name=["']formToken["'][^>]*value=["']([^"']+)["']/i) ||
     html.match(/value=["']([^"']+)["'][^>]*name=["']formToken["']/i);
-  return match?.[1] || null;
+  if (inputMatch?.[1]) return inputMatch[1];
+
+  const linkMatch = html.match(/[?&]formToken=([a-zA-Z0-9]+)/i);
+  if (linkMatch?.[1]) return linkMatch[1];
+
+  return null;
 }
 
 function getSetCookieValues(headers: Headers): string[] {
