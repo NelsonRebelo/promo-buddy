@@ -60,19 +60,7 @@ const Login = () => {
       </header>
 
       <main className="section-shell flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
-        <div className="mx-auto grid w-full max-w-5xl gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-12">
-          <section className="hero-glow fade-up space-y-6 self-center">
-            <p className="inline-flex items-center rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm">
-              VAS Promotion Console
-            </p>
-            <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">
-              Sign in to continue your campaign workflow.
-            </h1>
-            <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Designed for operational focus, with clear progress visibility and fast execution across bulk promotion requests.
-            </p>
-          </section>
-
+        <div className="mx-auto w-full max-w-md">
           <Card className="glass fade-up rounded-3xl border-white/80">
             <CardHeader className="space-y-2 pb-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
