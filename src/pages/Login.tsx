@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Loader2, LockKeyhole } from "lucide-react";
+import { Loader2, LockKeyhole } from "lucide-react";
 import { login, getStatus } from "@/lib/api";
 
 const Login = () => {
@@ -54,12 +54,7 @@ const Login = () => {
     <div className="min-h-screen">
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
         <div className="section-shell flex h-14 items-center justify-between">
-          <Button asChild variant="ghost" className="rounded-full px-3 text-xs sm:text-sm">
-            <Link to="/login">
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Back
-            </Link>
-          </Button>
+          <span className="text-sm font-semibold tracking-tight">Promo Buddy</span>
           <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Secure Access</span>
         </div>
       </header>
@@ -85,7 +80,7 @@ const Login = () => {
               </div>
               <CardTitle className="text-2xl font-semibold tracking-tight">Welcome back</CardTitle>
               <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-                Authenticate with your upstream API credentials.
+                Authenticate with your Standvirtual account credentials.
               </CardDescription>
             </CardHeader>
             <CardContent>

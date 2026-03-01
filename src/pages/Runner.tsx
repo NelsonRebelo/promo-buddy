@@ -6,6 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
   Table,
   TableBody,
   TableCell,
@@ -27,6 +35,7 @@ import {
 import { getStatus, sendVas, logout } from "@/lib/api";
 
 type CsvRow = { advert: string; promotion: string };
+type PromotionOption = { name: string; id: string };
 type Result = {
   advert: string;
   promotion: string;
@@ -41,6 +50,32 @@ type LogEntry = {
   success: boolean;
   message: string;
 };
+
+const PROMOTION_OPTIONS: PromotionOption[] = [
+  { name: "ad_bighomepage", id: "63" },
+  { name: "ad_bighomepage_3", id: "99" },
+  { name: "ad_bighomepage_7", id: "116" },
+  { name: "ad_bighomepage_14", id: "124" },
+  { name: "ad_homepage", id: "45" },
+  { name: "ad_homepage_3", id: "89" },
+  { name: "ad_homepage_7", id: "93" },
+  { name: "ad_homepage_14", id: "122" },
+  { name: "olx_homepage_7", id: "165" },
+  { name: "topads_14", id: "3" },
+  { name: "topads_3", id: "79" },
+  { name: "topads_7", id: "83" },
+  { name: "olx_topads_7", id: "161" },
+  { name: "olx_topads_28", id: "162" },
+  { name: "bump_up", id: "103" },
+  { name: "bump_up_7", id: "114" },
+  { name: "bump_up_14", id: "115" },
+  { name: "olx_bump_up_1", id: "163" },
+  { name: "olx_bump_up_7", id: "164" },
+  { name: "highlight_14", id: "6" },
+  { name: "highlight_3", id: "69" },
+  { name: "highlight_7", id: "73" },
+  { name: "export_olx", id: "49" },
+];
 
 function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -82,6 +117,9 @@ const Runner = () => {
   const [results, setResults] = useState<Result[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [done, setDone] = useState(false);
+  const [manualAdvert, setManualAdvert] = useState("");
+  const [manualPromotionId, setManualPromotionId] = useState("");
+  const [manualError, setManualError] = useState("");
   const cancelRef = useRef(false);
 
   useEffect(() => {
@@ -119,6 +157,26 @@ const Runner = () => {
   const addLog = useCallback((entry: LogEntry) => {
     setLogs((prev) => [entry, ...prev].slice(0, 50));
   }, []);
+
+  const addManualRow = () => {
+    const advert = manualAdvert.trim();
+    if (!advert || !manualPromotionId) {
+      setManualError("Please provide both advert ID and promotion.");
+      return;
+    }
+
+    setManualError("");
+    setRows((prev) => [...prev, { advert, promotion: manualPromotionId }]);
+    setResults([]);
+    setLogs([]);
+    setDone(false);
+    setCompleted(0);
+    setManualAdvert("");
+    setManualPromotionId("");
+  };
+
+  const getPromotionLabel = (promotionId: string) =>
+    PROMOTION_OPTIONS.find((option) => option.id === promotionId)?.name;
 
   const run = async () => {
     cancelRef.current = false;
@@ -255,6 +313,54 @@ const Runner = () => {
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-white/70 bg-white/70 p-4">
+                <p className="text-sm font-medium text-foreground">Add Single Advert</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Select promotion name, payload will send its promotion ID.
+                </p>
+                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.3fr_auto] lg:items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-advert">Advert ID</Label>
+                    <Input
+                      id="manual-advert"
+                      placeholder="e.g. 123456789"
+                      value={manualAdvert}
+                      onChange={(e) => setManualAdvert(e.target.value)}
+                      disabled={running}
+                      className="h-11 rounded-xl bg-white/80"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-promotion">Promotion</Label>
+                    <Select value={manualPromotionId} onValueChange={setManualPromotionId} disabled={running}>
+                      <SelectTrigger id="manual-promotion" className="h-11 rounded-xl bg-white/80">
+                        <SelectValue placeholder="Select promotion" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROMOTION_OPTIONS.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="button" onClick={addManualRow} disabled={running} className="h-11 rounded-xl px-6">
+                    Add
+                  </Button>
+                </div>
+                {manualPromotionId && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Payload promotion ID: <span className="font-semibold text-foreground">{manualPromotionId}</span>
+                  </p>
+                )}
+                {manualError && (
+                  <Alert variant="destructive" className="mt-3 rounded-2xl">
+                    <AlertDescription>{manualError}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
               {csvError && (
                 <Alert variant="destructive" className="rounded-2xl">
                   <AlertDescription>{csvError}</AlertDescription>
@@ -281,7 +387,16 @@ const Runner = () => {
                             <TableRow key={i} className="transition-colors hover:bg-white/70">
                               <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                               <TableCell>{r.advert}</TableCell>
-                              <TableCell>{r.promotion}</TableCell>
+                              <TableCell>
+                                {getPromotionLabel(r.promotion) ? (
+                                  <span>
+                                    {getPromotionLabel(r.promotion)}{" "}
+                                    <span className="text-xs text-muted-foreground">({r.promotion})</span>
+                                  </span>
+                                ) : (
+                                  r.promotion
+                                )}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
