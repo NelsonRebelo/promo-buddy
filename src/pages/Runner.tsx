@@ -16,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle2,
   Loader2,
@@ -90,6 +89,19 @@ function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
   }
 
   return { rows };
+}
+
+function getParsedMessage(errorMessage?: string): string {
+  if (!errorMessage) return "";
+  try {
+    const parsed = JSON.parse(errorMessage);
+    if (parsed && typeof parsed === "object" && typeof parsed.message === "string") {
+      return parsed.message;
+    }
+  } catch {
+    // Keep original error message when response is not JSON.
+  }
+  return errorMessage;
 }
 
 const CONCURRENCY = 5;
@@ -521,21 +533,17 @@ const Runner = () => {
                         <TableRow className="hover:bg-transparent">
                           <TableHead>Advert</TableHead>
                           <TableHead>Promotion</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Error</TableHead>
+                          <TableHead>Message</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {failures.map((f, i) => (
                           <TableRow key={i} className="transition-colors hover:bg-white/70">
                             <TableCell>{f.advert}</TableCell>
-                            <TableCell>{f.promotion}</TableCell>
-                            <TableCell>
-                              <Badge variant="destructive" className="rounded-full">
-                                {f.status}
-                              </Badge>
+                            <TableCell>{getPromotionLabel(f.promotion) || f.promotion}</TableCell>
+                            <TableCell className="max-w-xs truncate text-sm">
+                              {getParsedMessage(f.errorMessage) || String(f.status)}
                             </TableCell>
-                            <TableCell className="max-w-xs truncate text-sm">{f.errorMessage}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
