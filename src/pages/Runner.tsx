@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,13 +36,6 @@ type Result = {
   success: boolean;
   status: number | string;
   errorMessage?: string;
-};
-type LogEntry = {
-  index: number;
-  advert: string;
-  promotion: string;
-  success: boolean;
-  message: string;
 };
 
 const PROMOTION_OPTIONS: PromotionOption[] = [
@@ -109,7 +102,6 @@ const Runner = () => {
   const [running, setRunning] = useState(false);
   const [completed, setCompleted] = useState(0);
   const [results, setResults] = useState<Result[]>([]);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [done, setDone] = useState(false);
   const [manualAdvertsText, setManualAdvertsText] = useState("");
   const [manualPromotionIds, setManualPromotionIds] = useState<string[]>([]);
@@ -132,7 +124,6 @@ const Runner = () => {
     setCsvError("");
     setRows([]);
     setResults([]);
-    setLogs([]);
     setDone(false);
     setCompleted(0);
 
@@ -147,10 +138,6 @@ const Runner = () => {
     };
     reader.readAsText(file);
   };
-
-  const addLog = useCallback((entry: LogEntry) => {
-    setLogs((prev) => [entry, ...prev].slice(0, 50));
-  }, []);
 
   const togglePromotion = (promotionId: string, checked: boolean) => {
     setManualPromotionIds((prev) => {
@@ -182,7 +169,6 @@ const Runner = () => {
     setManualError("");
     setRows((prev) => [...prev, ...manualRows]);
     setResults([]);
-    setLogs([]);
     setDone(false);
     setCompleted(0);
     setManualAdvertsText("");
@@ -197,7 +183,6 @@ const Runner = () => {
     setRunning(true);
     setDone(false);
     setResults([]);
-    setLogs([]);
     setCompleted(0);
 
     const allResults: Result[] = [];
@@ -226,13 +211,6 @@ const Runner = () => {
           };
 
           allResults.push(result);
-          addLog({
-            index: i,
-            advert: row.advert,
-            promotion: row.promotion,
-            success: data.success,
-            message: data.success ? "OK" : data.errorMessage || `Error ${data.status}`,
-          });
         } catch (err: any) {
           const result: Result = {
             advert: row.advert,
@@ -243,13 +221,6 @@ const Runner = () => {
           };
 
           allResults.push(result);
-          addLog({
-            index: i,
-            advert: row.advert,
-            promotion: row.promotion,
-            success: false,
-            message: "Network error",
-          });
         }
 
         setCompleted((c) => c + 1);
@@ -536,33 +507,6 @@ const Runner = () => {
           </Card>
         )}
 
-        {logs.length > 0 && (
-          <Card className="glass rounded-3xl border-white/75">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold tracking-tight">Live Log</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="max-h-56 space-y-1.5 overflow-auto rounded-2xl border border-white/70 bg-white/65 p-3 font-mono text-xs">
-                {logs.map((l, i) => (
-                  <div key={i} className="flex flex-wrap items-center gap-2 text-[0.74rem] leading-relaxed">
-                    <Badge
-                      variant={l.success ? "default" : "destructive"}
-                      className="min-w-12 justify-center rounded-full text-[0.62rem]"
-                    >
-                      {l.success ? "OK" : "FAIL"}
-                    </Badge>
-                    <span className="text-muted-foreground">#{l.index + 1}</span>
-                    <span>
-                      {l.advert} → {l.promotion}
-                    </span>
-                    {!l.success && <span className="text-destructive">({l.message})</span>}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {done && (
           <Card className="glass rounded-3xl border-white/75">
             <CardHeader className="pb-2">
@@ -612,7 +556,6 @@ const Runner = () => {
                 onClick={() => {
                   setRows([]);
                   setResults([]);
-                  setLogs([]);
                   setDone(false);
                   setCompleted(0);
                 }}
