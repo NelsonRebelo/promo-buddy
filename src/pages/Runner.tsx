@@ -1,13 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -18,7 +15,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
-  ArrowLeft,
   CheckCircle2,
   Loader2,
   LogOut,
@@ -30,7 +26,6 @@ import {
 import { getStatus, sendVas, logout } from "@/lib/api";
 
 type CsvRow = { advert: string; promotion: string };
-type PromotionOption = { name: string; id: string };
 type Result = {
   advert: string;
   promotion: string;
@@ -45,32 +40,6 @@ type LogEntry = {
   success: boolean;
   message: string;
 };
-
-const PROMOTION_OPTIONS: PromotionOption[] = [
-  { name: "ad_bighomepage", id: "63" },
-  { name: "ad_bighomepage_3", id: "99" },
-  { name: "ad_bighomepage_7", id: "116" },
-  { name: "ad_bighomepage_14", id: "124" },
-  { name: "ad_homepage", id: "45" },
-  { name: "ad_homepage_3", id: "89" },
-  { name: "ad_homepage_7", id: "93" },
-  { name: "ad_homepage_14", id: "122" },
-  { name: "olx_homepage_7", id: "165" },
-  { name: "topads_14", id: "3" },
-  { name: "topads_3", id: "79" },
-  { name: "topads_7", id: "83" },
-  { name: "olx_topads_7", id: "161" },
-  { name: "olx_topads_28", id: "162" },
-  { name: "bump_up", id: "103" },
-  { name: "bump_up_7", id: "114" },
-  { name: "bump_up_14", id: "115" },
-  { name: "olx_bump_up_1", id: "163" },
-  { name: "olx_bump_up_7", id: "164" },
-  { name: "highlight_14", id: "6" },
-  { name: "highlight_3", id: "69" },
-  { name: "highlight_7", id: "73" },
-  { name: "export_olx", id: "49" },
-];
 
 function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -112,9 +81,6 @@ const Runner = () => {
   const [results, setResults] = useState<Result[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [done, setDone] = useState(false);
-  const [manualAdvertsText, setManualAdvertsText] = useState("");
-  const [manualPromotionIds, setManualPromotionIds] = useState<string[]>([]);
-  const [manualError, setManualError] = useState("");
   const cancelRef = useRef(false);
 
   useEffect(() => {
@@ -152,45 +118,6 @@ const Runner = () => {
   const addLog = useCallback((entry: LogEntry) => {
     setLogs((prev) => [entry, ...prev].slice(0, 50));
   }, []);
-
-  const togglePromotion = (promotionId: string, checked: boolean) => {
-    setManualPromotionIds((prev) => {
-      if (checked) {
-        return prev.includes(promotionId) ? prev : [...prev, promotionId];
-      }
-      return prev.filter((id) => id !== promotionId);
-    });
-  };
-
-  const addManualRow = () => {
-    const adverts = manualAdvertsText
-      .split(/\r?\n/)
-      .map((advert) => advert.trim())
-      .filter(Boolean);
-
-    if (adverts.length === 0 || manualPromotionIds.length === 0) {
-      setManualError("Please provide at least one advert ID and one promotion.");
-      return;
-    }
-
-    setManualError("");
-    const manualRows: CsvRow[] = [];
-    for (const advert of adverts) {
-      for (const promotionId of manualPromotionIds) {
-        manualRows.push({ advert, promotion: promotionId });
-      }
-    }
-    setRows((prev) => [...prev, ...manualRows]);
-    setResults([]);
-    setLogs([]);
-    setDone(false);
-    setCompleted(0);
-    setManualAdvertsText("");
-    setManualPromotionIds([]);
-  };
-
-  const getPromotionLabel = (promotionId: string) =>
-    PROMOTION_OPTIONS.find((option) => option.id === promotionId)?.name;
 
   const run = async () => {
     cancelRef.current = false;
@@ -285,15 +212,7 @@ const Runner = () => {
     <div className="min-h-screen pb-10">
       <header className="sticky top-0 z-50 border-b border-white/70 bg-white/72 backdrop-blur-xl">
         <div className="section-shell flex h-14 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm" className="rounded-full px-3">
-              <Link to="/login">
-                <ArrowLeft className="mr-1.5 h-4 w-4" />
-                Login
-              </Link>
-            </Button>
-            <span className="hidden text-sm font-medium text-muted-foreground sm:inline">Bulk VAS Runner</span>
-          </div>
+          <span className="text-sm font-medium text-muted-foreground">Bulk VAS Runner</span>
           <Button
             variant="ghost"
             size="sm"
@@ -332,82 +251,6 @@ const Runner = () => {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/70 bg-white/70 p-4">
-                <p className="text-sm font-medium text-foreground">Add Adverts Manually</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Add the ID and the VAS you want the seller to buy
-                </p>
-                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.3fr]">
-                  <div className="space-y-2">
-                    <Label htmlFor="manual-advert">Advert IDs (one per line)</Label>
-                    <Textarea
-                      id="manual-advert"
-                      placeholder={"1234\n12123\n123\n1231\n1231\n312"}
-                      value={manualAdvertsText}
-                      onChange={(e) => setManualAdvertsText(e.target.value)}
-                      disabled={running}
-                      className="min-h-28 rounded-xl bg-white/80"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Promotions</Label>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 rounded-full px-3 text-xs"
-                          onClick={() => setManualPromotionIds(PROMOTION_OPTIONS.map((option) => option.id))}
-                          disabled={running}
-                        >
-                          Select all
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 rounded-full px-3 text-xs"
-                          onClick={() => setManualPromotionIds([])}
-                          disabled={running}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="max-h-40 space-y-2 overflow-auto rounded-xl border border-white/70 bg-white/80 p-3">
-                      {PROMOTION_OPTIONS.map((option) => (
-                        <label key={option.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                          <Checkbox
-                            checked={manualPromotionIds.includes(option.id)}
-                            onCheckedChange={(checked) => togglePromotion(option.id, checked === true)}
-                            disabled={running}
-                          />
-                          <span>{option.name}</span>
-                          <span className="text-xs text-muted-foreground">({option.id})</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <Button type="button" onClick={addManualRow} disabled={running} className="h-11 rounded-xl px-6">
-                    Add
-                  </Button>
-                </div>
-                {manualPromotionIds.length > 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Selected promotion IDs:{" "}
-                    <span className="font-semibold text-foreground">{manualPromotionIds.join(", ")}</span>
-                  </p>
-                )}
-                {manualError && (
-                  <Alert variant="destructive" className="mt-3 rounded-2xl">
-                    <AlertDescription>{manualError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
               {csvError && (
                 <Alert variant="destructive" className="rounded-2xl">
                   <AlertDescription>{csvError}</AlertDescription>
@@ -434,16 +277,7 @@ const Runner = () => {
                             <TableRow key={i} className="transition-colors hover:bg-white/70">
                               <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                               <TableCell>{r.advert}</TableCell>
-                              <TableCell>
-                                {getPromotionLabel(r.promotion) ? (
-                                  <span>
-                                    {getPromotionLabel(r.promotion)}{" "}
-                                    <span className="text-xs text-muted-foreground">({r.promotion})</span>
-                                  </span>
-                                ) : (
-                                  r.promotion
-                                )}
-                              </TableCell>
+                              <TableCell>{r.promotion}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
