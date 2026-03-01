@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type OfferTokenInfo = {
   formToken: string | null;
@@ -8,6 +11,7 @@ type OfferTokenInfo = {
 const STORAGE_KEY = "offer_token_info";
 
 const OfferPromotionResult = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<OfferTokenInfo | null>(null);
 
   useEffect(() => {
@@ -20,11 +24,24 @@ const OfferPromotionResult = () => {
     }
   }, []);
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/", { replace: true });
+  };
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
-        <div className="section-shell flex h-14 items-center">
+        <div className="section-shell flex h-14 items-center justify-between">
+          <Button type="button" variant="ghost" size="sm" onClick={handleBack} className="rounded-full px-3">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Back
+          </Button>
           <span className="text-sm font-semibold tracking-tight">Promo Buddy</span>
+          <span className="w-[76px]" />
         </div>
       </header>
 

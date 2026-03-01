@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  ArrowLeft,
   CheckCircle2,
   Loader2,
   LogOut,
@@ -261,6 +262,14 @@ const Runner = () => {
     navigate("/login", { replace: true });
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/", { replace: true });
+  };
+
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -278,6 +287,10 @@ const Runner = () => {
     <div className="min-h-screen pb-10">
       <header className="sticky top-0 z-50 border-b border-white/70 bg-white/72 backdrop-blur-xl">
         <div className="section-shell flex h-14 items-center justify-between">
+          <Button type="button" variant="ghost" size="sm" onClick={handleBack} className="rounded-full px-3">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Back
+          </Button>
           <span className="text-sm font-medium text-muted-foreground">Promo Buddy</span>
           <Button
             variant="ghost"

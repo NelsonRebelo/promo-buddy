@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, LockKeyhole } from "lucide-react";
+import { ArrowLeft, Loader2, LockKeyhole } from "lucide-react";
 import { login, getStatus } from "@/lib/api";
 
 const Login = () => {
@@ -14,6 +14,13 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/", { replace: true });
+  };
 
   useEffect(() => {
     getStatus()
@@ -54,6 +61,10 @@ const Login = () => {
     <div className="min-h-screen">
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
         <div className="section-shell flex h-14 items-center justify-between">
+          <Button type="button" variant="ghost" size="sm" className="rounded-full px-3" onClick={handleBack}>
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Back
+          </Button>
           <span className="text-sm font-semibold tracking-tight">Promo Buddy</span>
           <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Secure Access</span>
         </div>

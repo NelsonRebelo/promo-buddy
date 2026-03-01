@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { getOfferTokenInfo } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 type OfferTokenInfo = {
   ok: boolean;
@@ -11,8 +13,21 @@ type OfferTokenInfo = {
 };
 
 const OfferPromotionPopup = () => {
+  const navigate = useNavigate();
   const [status, setStatus] = useState("Retrieving token information...");
   const [error, setError] = useState("");
+
+  const handleBack = () => {
+    if (window.opener && !window.opener.closed) {
+      window.close();
+      return;
+    }
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/", { replace: true });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -57,7 +72,14 @@ const OfferPromotionPopup = () => {
   }, []);
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
+    <div className="min-h-screen p-6">
+      <div className="mx-auto mb-4 flex w-full max-w-md">
+        <Button type="button" variant="ghost" size="sm" onClick={handleBack} className="rounded-full px-3">
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Back
+        </Button>
+      </div>
+      <div className="flex items-center justify-center">
       <div className="glass w-full max-w-md rounded-3xl border-white/80 p-6 text-center">
         <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Loader2 className="h-5 w-5 animate-spin" />
@@ -73,6 +95,7 @@ const OfferPromotionPopup = () => {
             Close
           </button>
         )}
+      </div>
       </div>
     </div>
   );
