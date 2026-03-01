@@ -299,6 +299,11 @@ const Runner = () => {
               <CardTitle className="text-xl font-semibold tracking-tight">Upload CSV</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <Alert className="rounded-2xl border-amber-200 bg-amber-50/90 text-amber-900">
+                <AlertDescription>
+                  The VAS you are about to add is paid by the client. Be cautions and sure of what you are doing
+                </AlertDescription>
+              </Alert>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Input
                   type="file"
