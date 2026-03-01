@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
+  const openOfferLoginPopup = () => {
+    window.open(
+      "https://www.standvirtual.com/adminpanel/login/",
+      "offer-promotion-login",
+      "popup=yes,width=560,height=760,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes",
+    );
+  };
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
@@ -21,10 +29,13 @@ const Index = () => {
             <Button asChild className="h-12 rounded-xl text-sm font-medium shadow-sm">
               <Link to="/login">Investment promotion</Link>
             </Button>
-            <Button asChild type="button" variant="outline" className="h-12 rounded-xl border-white/80 bg-white/70 text-sm">
-              <a href="https://www.standvirtual.com/adminpanel/login/" target="_blank" rel="noreferrer">
-                Offer Promotion
-              </a>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 rounded-xl border-white/80 bg-white/70 text-sm"
+              onClick={openOfferLoginPopup}
+            >
+              Offer Promotion
             </Button>
           </CardContent>
         </Card>
