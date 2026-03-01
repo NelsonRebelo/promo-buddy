@@ -5,14 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -117,8 +112,8 @@ const Runner = () => {
   const [results, setResults] = useState<Result[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [done, setDone] = useState(false);
-  const [manualAdvert, setManualAdvert] = useState("");
-  const [manualPromotionId, setManualPromotionId] = useState("");
+  const [manualAdvertsText, setManualAdvertsText] = useState("");
+  const [manualPromotionIds, setManualPromotionIds] = useState<string[]>([]);
   const [manualError, setManualError] = useState("");
   const cancelRef = useRef(false);
 
@@ -158,21 +153,40 @@ const Runner = () => {
     setLogs((prev) => [entry, ...prev].slice(0, 50));
   }, []);
 
+  const togglePromotion = (promotionId: string, checked: boolean) => {
+    setManualPromotionIds((prev) => {
+      if (checked) {
+        return prev.includes(promotionId) ? prev : [...prev, promotionId];
+      }
+      return prev.filter((id) => id !== promotionId);
+    });
+  };
+
   const addManualRow = () => {
-    const advert = manualAdvert.trim();
-    if (!advert || !manualPromotionId) {
-      setManualError("Please provide both advert ID and promotion.");
+    const adverts = manualAdvertsText
+      .split(/\r?\n/)
+      .map((advert) => advert.trim())
+      .filter(Boolean);
+
+    if (adverts.length === 0 || manualPromotionIds.length === 0) {
+      setManualError("Please provide at least one advert ID and one promotion.");
       return;
     }
 
     setManualError("");
-    setRows((prev) => [...prev, { advert, promotion: manualPromotionId }]);
+    const manualRows: CsvRow[] = [];
+    for (const advert of adverts) {
+      for (const promotionId of manualPromotionIds) {
+        manualRows.push({ advert, promotion: promotionId });
+      }
+    }
+    setRows((prev) => [...prev, ...manualRows]);
     setResults([]);
     setLogs([]);
     setDone(false);
     setCompleted(0);
-    setManualAdvert("");
-    setManualPromotionId("");
+    setManualAdvertsText("");
+    setManualPromotionIds([]);
   };
 
   const getPromotionLabel = (promotionId: string) =>
@@ -319,44 +333,72 @@ const Runner = () => {
               </div>
 
               <div className="rounded-2xl border border-white/70 bg-white/70 p-4">
-                <p className="text-sm font-medium text-foreground">Add Single Advert</p>
+                <p className="text-sm font-medium text-foreground">Add Adverts Manually</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Select promotion name, payload will send its promotion ID.
+                  Add the ID and the VAS you want the seller to buy
                 </p>
-                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.3fr_auto] lg:items-end">
+                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.3fr]">
                   <div className="space-y-2">
-                    <Label htmlFor="manual-advert">Advert ID</Label>
-                    <Input
+                    <Label htmlFor="manual-advert">Advert IDs (one per line)</Label>
+                    <Textarea
                       id="manual-advert"
-                      placeholder="e.g. 123456789"
-                      value={manualAdvert}
-                      onChange={(e) => setManualAdvert(e.target.value)}
+                      placeholder={"1234\n12123\n123\n1231\n1231\n312"}
+                      value={manualAdvertsText}
+                      onChange={(e) => setManualAdvertsText(e.target.value)}
                       disabled={running}
-                      className="h-11 rounded-xl bg-white/80"
+                      className="min-h-28 rounded-xl bg-white/80"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="manual-promotion">Promotion</Label>
-                    <Select value={manualPromotionId} onValueChange={setManualPromotionId} disabled={running}>
-                      <SelectTrigger id="manual-promotion" className="h-11 rounded-xl bg-white/80">
-                        <SelectValue placeholder="Select promotion" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PROMOTION_OPTIONS.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center justify-between">
+                      <Label>Promotions</Label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 rounded-full px-3 text-xs"
+                          onClick={() => setManualPromotionIds(PROMOTION_OPTIONS.map((option) => option.id))}
+                          disabled={running}
+                        >
+                          Select all
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 rounded-full px-3 text-xs"
+                          onClick={() => setManualPromotionIds([])}
+                          disabled={running}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-40 space-y-2 overflow-auto rounded-xl border border-white/70 bg-white/80 p-3">
+                      {PROMOTION_OPTIONS.map((option) => (
+                        <label key={option.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={manualPromotionIds.includes(option.id)}
+                            onCheckedChange={(checked) => togglePromotion(option.id, checked === true)}
+                            disabled={running}
+                          />
+                          <span>{option.name}</span>
+                          <span className="text-xs text-muted-foreground">({option.id})</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
+                </div>
+                <div className="mt-3">
                   <Button type="button" onClick={addManualRow} disabled={running} className="h-11 rounded-xl px-6">
                     Add
                   </Button>
                 </div>
-                {manualPromotionId && (
+                {manualPromotionIds.length > 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Payload promotion ID: <span className="font-semibold text-foreground">{manualPromotionId}</span>
+                    Selected promotion IDs:{" "}
+                    <span className="font-semibold text-foreground">{manualPromotionIds.join(", ")}</span>
                   </p>
                 )}
                 {manualError && (
