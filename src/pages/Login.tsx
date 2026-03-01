@@ -55,7 +55,7 @@ const Login = () => {
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
         <div className="section-shell flex h-14 items-center justify-between">
           <Button asChild variant="ghost" className="rounded-full px-3 text-xs sm:text-sm">
-            <Link to="/">
+            <Link to="/login">
               <ArrowLeft className="mr-1.5 h-4 w-4" />
               Back
             </Link>

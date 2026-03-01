@@ -215,9 +215,9 @@ const Runner = () => {
         <div className="section-shell flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm" className="rounded-full px-3">
-              <Link to="/">
+              <Link to="/login">
                 <ArrowLeft className="mr-1.5 h-4 w-4" />
-                Home
+                Login
               </Link>
             </Button>
             <span className="hidden text-sm font-medium text-muted-foreground sm:inline">Bulk VAS Runner</span>
