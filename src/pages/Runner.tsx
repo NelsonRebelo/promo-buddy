@@ -286,7 +286,7 @@ const Runner = () => {
   return (
     <div className="min-h-screen pb-10">
       <header className="sticky top-0 z-50 border-b border-white/70 bg-white/72 backdrop-blur-xl">
-        <div className="section-shell flex h-14 items-center justify-between">
+        <div className="section-shell flex h-16 items-center justify-between">
           <Button type="button" variant="ghost" size="sm" onClick={handleBack} className="rounded-full px-3">
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             Back
@@ -304,30 +304,32 @@ const Runner = () => {
         </div>
       </header>
 
-      <main className="section-shell mt-6 space-y-6 sm:mt-8">
-        <section className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-4 md:col-span-2">
+      <main className="section-shell mt-8 space-y-8 pb-6">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-6">
             <Card className="glass rounded-3xl border-white/75">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-4">
                 <CardTitle className="text-xl font-semibold tracking-tight">Upload CSV</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
                 <Alert className="rounded-2xl border-amber-200 bg-amber-50/90 text-amber-900">
                   <AlertDescription>
                     The VAS you are about to add is paid by the client. Be cautious and sure of what you are doing
                   </AlertDescription>
                 </Alert>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFile}
-                    disabled={running}
-                    className="h-11 max-w-full rounded-xl bg-white/80 sm:max-w-sm"
-                  />
-                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                    <Upload className="h-4 w-4" strokeWidth={1.8} />
-                    <span>Headers required: advert, promotion</span>
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFile}
+                      disabled={running}
+                      className="h-11 max-w-full rounded-xl bg-white/90 sm:max-w-sm"
+                    />
+                    <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                      <Upload className="h-4 w-4" strokeWidth={1.8} />
+                      <span>Headers required: advert, promotion</span>
+                    </div>
                   </div>
                 </div>
 
@@ -339,11 +341,11 @@ const Runner = () => {
 
                 {rows.length > 0 && (
                   <>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm font-medium text-muted-foreground">
                       {rows.length} row{rows.length !== 1 ? "s" : ""} loaded
                     </p>
-                    <div className="overflow-hidden rounded-2xl border border-white/70 bg-white/70">
-                      <div className="max-h-64 overflow-auto">
+                    <div className="overflow-hidden rounded-2xl border border-white/70 bg-white/75">
+                      <div className="max-h-72 overflow-auto">
                         <Table>
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
@@ -382,10 +384,10 @@ const Runner = () => {
             </Card>
 
             <Card className="glass rounded-3xl border-white/75">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-4">
                 <CardTitle className="text-xl font-semibold tracking-tight">Add Adverts Manually</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <div className="flex justify-end">
                   <Button type="button" onClick={addManualRows} disabled={running} className="h-9 rounded-lg px-4">
                     Add
@@ -401,17 +403,17 @@ const Runner = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2">
                     <div className="p-3">
                       <div className="rounded-lg border border-slate-200 bg-white/95 p-2">
-                      <Label htmlFor="manual-advert" className="sr-only">
-                        Advert IDs
-                      </Label>
-                      <Textarea
-                        id="manual-advert"
-                        placeholder={"809343445\n809234234\n..."}
-                        value={manualAdvertsText}
-                        onChange={(e) => setManualAdvertsText(e.target.value)}
-                        disabled={running}
-                        className="min-h-32 rounded-lg border-white/80 bg-white"
-                      />
+                        <Label htmlFor="manual-advert" className="sr-only">
+                          Advert IDs
+                        </Label>
+                        <Textarea
+                          id="manual-advert"
+                          placeholder={"809343445\n809234234\n..."}
+                          value={manualAdvertsText}
+                          onChange={(e) => setManualAdvertsText(e.target.value)}
+                          disabled={running}
+                          className="min-h-40 rounded-lg border-white/80 bg-white"
+                        />
                       </div>
                     </div>
 
@@ -442,7 +444,7 @@ const Runner = () => {
 
                         <div className="max-h-36 space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
                           {PROMOTION_OPTIONS.map((option) => (
-                            <label key={option.id} className="flex cursor-pointer items-center gap-2 px-1 py-0.5 text-sm">
+                            <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-slate-50">
                               <Checkbox
                                 checked={manualPromotionIds.includes(option.id)}
                                 onCheckedChange={(checked) => togglePromotion(option.id, checked === true)}
@@ -467,14 +469,28 @@ const Runner = () => {
             </Card>
           </div>
 
-          <Card className="glass rounded-3xl border-white/75">
-            <CardHeader className="pb-2">
+          <Card className="glass rounded-3xl border-white/75 xl:sticky xl:top-24 xl:h-fit">
+            <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold tracking-tight">Run Control</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <p className="text-sm leading-relaxed text-muted-foreground">
                 Process requests with controlled concurrency and live feedback.
               </p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rows</p>
+                  <p className="text-lg font-semibold">{rows.length}</p>
+                </div>
+                <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Done</p>
+                  <p className="text-lg font-semibold">{completed}</p>
+                </div>
+                <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">%</p>
+                  <p className="text-lg font-semibold">{Math.round(progress)}</p>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Button
                   onClick={run}
@@ -513,7 +529,7 @@ const Runner = () => {
 
         {(running || done) && (
           <Card className="glass rounded-3xl border-white/75">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold tracking-tight">Progress</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
