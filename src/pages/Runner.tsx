@@ -300,33 +300,87 @@ const Runner = () => {
 
       <main className="section-shell mt-6 space-y-6 sm:mt-8">
         <section className="grid gap-4 md:grid-cols-3">
-          <Card className="glass rounded-3xl border-white/75 md:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xl font-semibold tracking-tight">Upload CSV</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert className="rounded-2xl border-amber-200 bg-amber-50/90 text-amber-900">
-                <AlertDescription>
-                  The VAS you are about to add is paid by the client. Be cautions and sure of what you are doing
-                </AlertDescription>
-              </Alert>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFile}
-                  disabled={running}
-                  className="h-11 max-w-full rounded-xl bg-white/80 sm:max-w-sm"
-                />
-                <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                  <Upload className="h-4 w-4" strokeWidth={1.8} />
-                  <span>Headers required: advert, promotion</span>
+          <div className="space-y-4 md:col-span-2">
+            <Card className="glass rounded-3xl border-white/75">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl font-semibold tracking-tight">Upload CSV</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert className="rounded-2xl border-amber-200 bg-amber-50/90 text-amber-900">
+                  <AlertDescription>
+                    The VAS you are about to add is paid by the client. Be cautions and sure of what you are doing
+                  </AlertDescription>
+                </Alert>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFile}
+                    disabled={running}
+                    className="h-11 max-w-full rounded-xl bg-white/80 sm:max-w-sm"
+                  />
+                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <Upload className="h-4 w-4" strokeWidth={1.8} />
+                    <span>Headers required: advert, promotion</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="rounded-2xl border border-white/70 bg-white/70 p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-medium text-foreground">Add Adverts Manually</p>
+                {csvError && (
+                  <Alert variant="destructive" className="rounded-2xl">
+                    <AlertDescription>{csvError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {rows.length > 0 && (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      {rows.length} row{rows.length !== 1 ? "s" : ""} loaded
+                    </p>
+                    <div className="overflow-hidden rounded-2xl border border-white/70 bg-white/70">
+                      <div className="max-h-64 overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="w-14">#</TableHead>
+                              <TableHead>Advert</TableHead>
+                              <TableHead>Promotion</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rows.slice(0, 20).map((r, i) => (
+                              <TableRow key={i} className="transition-colors hover:bg-white/70">
+                                <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                                <TableCell>{r.advert}</TableCell>
+                                <TableCell>
+                                  {getPromotionLabel(r.promotion) ? (
+                                    <span>
+                                      {getPromotionLabel(r.promotion)}{" "}
+                                      <span className="text-xs text-muted-foreground">({r.promotion})</span>
+                                    </span>
+                                  ) : (
+                                    r.promotion
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                    {rows.length > 20 && (
+                      <p className="text-xs text-muted-foreground">Showing first 20 of {rows.length} rows</p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="glass rounded-3xl border-white/75">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl font-semibold tracking-tight">Add Adverts Manually</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-end">
                   <Button type="button" onClick={addManualRows} disabled={running} className="h-9 rounded-lg px-4">
                     Add
                   </Button>
@@ -345,7 +399,7 @@ const Runner = () => {
                       </Label>
                       <Textarea
                         id="manual-advert"
-                        placeholder={"1234\n12123\n123\n1231\n1231\n312"}
+                        placeholder={"809343445\n809234234\n..."}
                         value={manualAdvertsText}
                         onChange={(e) => setManualAdvertsText(e.target.value)}
                         disabled={running}
@@ -395,61 +449,13 @@ const Runner = () => {
                 </div>
 
                 {manualError && (
-                  <Alert variant="destructive" className="mt-3 rounded-2xl">
+                  <Alert variant="destructive" className="rounded-2xl">
                     <AlertDescription>{manualError}</AlertDescription>
                   </Alert>
                 )}
-              </div>
-
-              {csvError && (
-                <Alert variant="destructive" className="rounded-2xl">
-                  <AlertDescription>{csvError}</AlertDescription>
-                </Alert>
-              )}
-
-              {rows.length > 0 && (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    {rows.length} row{rows.length !== 1 ? "s" : ""} loaded
-                  </p>
-                  <div className="overflow-hidden rounded-2xl border border-white/70 bg-white/70">
-                    <div className="max-h-64 overflow-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="hover:bg-transparent">
-                            <TableHead className="w-14">#</TableHead>
-                            <TableHead>Advert</TableHead>
-                            <TableHead>Promotion</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {rows.slice(0, 20).map((r, i) => (
-                            <TableRow key={i} className="transition-colors hover:bg-white/70">
-                              <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                              <TableCell>{r.advert}</TableCell>
-                              <TableCell>
-                                {getPromotionLabel(r.promotion) ? (
-                                  <span>
-                                    {getPromotionLabel(r.promotion)}{" "}
-                                    <span className="text-xs text-muted-foreground">({r.promotion})</span>
-                                  </span>
-                                ) : (
-                                  r.promotion
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                  {rows.length > 20 && (
-                    <p className="text-xs text-muted-foreground">Showing first 20 of {rows.length} rows</p>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card className="glass rounded-3xl border-white/75">
             <CardHeader className="pb-2">
