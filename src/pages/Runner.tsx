@@ -98,10 +98,20 @@ function getParsedMessage(errorMessage?: string): string {
     if (parsed && typeof parsed === "object" && typeof parsed.message === "string") {
       return parsed.message;
     }
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "error" in parsed &&
+      parsed.error &&
+      typeof parsed.error === "object" &&
+      typeof (parsed.error as { message?: unknown }).message === "string"
+    ) {
+      return (parsed.error as { message: string }).message;
+    }
   } catch {
-    // Keep original error message when response is not JSON.
+    // Ignore non-JSON strings because only parsed message values should be shown.
   }
-  return errorMessage;
+  return "";
 }
 
 const CONCURRENCY = 5;
@@ -542,7 +552,7 @@ const Runner = () => {
                             <TableCell>{f.advert}</TableCell>
                             <TableCell>{getPromotionLabel(f.promotion) || f.promotion}</TableCell>
                             <TableCell className="max-w-xs truncate text-sm">
-                              {getParsedMessage(f.errorMessage) || String(f.status)}
+                              {getParsedMessage(f.errorMessage)}
                             </TableCell>
                           </TableRow>
                         ))}
