@@ -1,27 +1,9 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Construction } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-type OfferTokenInfo = {
-  formToken: string | null;
-};
-
-const STORAGE_KEY = "offer_token_info";
 
 const OfferPromotionResult = () => {
   const navigate = useNavigate();
-  const [data, setData] = useState<OfferTokenInfo | null>(null);
-
-  useEffect(() => {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    try {
-      setData(JSON.parse(raw) as OfferTokenInfo);
-    } catch {
-      setData(null);
-    }
-  }, []);
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -45,16 +27,14 @@ const OfferPromotionResult = () => {
       </header>
 
       <main className="section-shell flex min-h-[calc(100vh-3.5rem)] items-center justify-center py-10 sm:py-16">
-        <div className="glass w-full max-w-3xl rounded-3xl border-white/80 p-6 sm:p-8">
-          <h1 className="text-2xl font-semibold tracking-tight">Offer Promotion Token Info</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Token value retrieved from adminpanel flow.</p>
-
-          <div className="mt-6 rounded-2xl border border-white/80 bg-white/75 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">formToken</p>
-            <pre className="mt-2 whitespace-pre-wrap break-all text-sm text-foreground">
-              {data?.formToken || "(not available)"}
-            </pre>
+        <div className="glass w-full max-w-2xl rounded-3xl border-white/80 p-8 text-center sm:p-10">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Construction className="h-7 w-7" />
           </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Offer Promotion Under Construction</h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            We are finalizing a secure flow to retrieve required data from external login. This section will be available soon.
+          </p>
         </div>
       </main>
     </div>
