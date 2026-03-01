@@ -412,7 +412,7 @@ const Runner = () => {
                           value={manualAdvertsText}
                           onChange={(e) => setManualAdvertsText(e.target.value)}
                           disabled={running}
-                          className="min-h-40 rounded-lg border-white/80 bg-white"
+                          className="min-h-36 rounded-lg border-white/80 bg-white"
                         />
                       </div>
                     </div>
