@@ -40,6 +40,13 @@ export async function login(data: { username: string; password: string }) {
     body: JSON.stringify(data),
   });
   const json = await res.json();
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: json.error || json.message || `HTTP ${res.status}`,
+      detail: json.detail,
+    };
+  }
   if (json.ok && json.session_id) {
     setSessionId(json.session_id);
   }
