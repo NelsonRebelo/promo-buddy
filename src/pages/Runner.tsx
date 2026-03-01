@@ -402,7 +402,7 @@ const Runner = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2">
                     <div className="p-3">
-                      <div className="rounded-lg border border-slate-200 bg-white/95 p-2">
+                      <div className="h-full rounded-lg border border-slate-200 bg-white/95 p-2">
                         <Label htmlFor="manual-advert" className="sr-only">
                           Advert IDs
                         </Label>
@@ -412,13 +412,13 @@ const Runner = () => {
                           value={manualAdvertsText}
                           onChange={(e) => setManualAdvertsText(e.target.value)}
                           disabled={running}
-                          className="min-h-36 rounded-lg border-white/80 bg-white"
+                          className="h-[300px] rounded-lg border-white/80 bg-white"
                         />
                       </div>
                     </div>
 
                     <div className="border-t border-white/80 p-3 sm:border-l sm:border-t-0">
-                      <div className="rounded-lg border border-slate-200 bg-white/95 p-2">
+                      <div className="h-full rounded-lg border border-slate-200 bg-white/95 p-2">
                         <div className="mb-2 flex items-center gap-2">
                           <Button
                             type="button"
@@ -442,7 +442,7 @@ const Runner = () => {
                           </Button>
                         </div>
 
-                        <div className="max-h-36 space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
+                        <div className="h-[248px] space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
                           {PROMOTION_OPTIONS.map((option) => (
                             <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-slate-50">
                               <Checkbox
