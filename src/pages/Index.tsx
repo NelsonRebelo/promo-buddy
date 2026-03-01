@@ -30,14 +30,23 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="relative min-h-screen overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <img
+          src="https://media.licdn.com/dms/image/v2/C4D1BAQH4PUv6QKg_Ag/company-background_10000/company-background_10000/0/1591019721058/standvirtual_cover?e=1772942400&v=beta&t=Pb1KZ6O_5v6YZDtU4JFVwJ99EWiYEkzDRkaHG6aj8vo"
+          alt=""
+          className="h-full w-full scale-105 object-cover blur-sm"
+        />
+        <div className="absolute inset-0 bg-white/62" />
+      </div>
+
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
         <div className="section-shell flex h-14 items-center">
           <span className="text-sm font-semibold tracking-tight">Promo Buddy</span>
         </div>
       </header>
 
-      <main className="section-shell flex min-h-[calc(100vh-3.5rem)] items-center justify-center py-10 sm:py-16">
+      <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center py-10 sm:py-16">
         <Card className="glass w-full max-w-2xl rounded-3xl border-white/80">
           <CardHeader className="space-y-2 pb-4 text-center">
             <CardTitle className="text-3xl font-semibold tracking-tight">Choose Promotion Type</CardTitle>
