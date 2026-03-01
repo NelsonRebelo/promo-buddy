@@ -78,8 +78,20 @@ const Login = () => {
         </div>
       </header>
 
-      <main className="section-shell flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
-        <div className="mx-auto w-full max-w-md">
+      <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl"
+        >
+          <img
+            src="https://media.licdn.com/dms/image/v2/C4D1BAQH4PUv6QKg_Ag/company-background_10000/company-background_10000/0/1591019721058/standvirtual_cover?e=1772942400&v=beta&t=Pb1KZ6O_5v6YZDtU4JFVwJ99EWiYEkzDRkaHG6aj8vo"
+            alt=""
+            className="h-full w-full scale-105 object-cover blur-sm"
+          />
+          <div className="absolute inset-0 bg-white/60" />
+        </div>
+
+        <div className="relative mx-auto w-full max-w-md">
           <Card className="glass fade-up rounded-3xl border-white/80">
             <CardHeader className="space-y-2 pb-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
