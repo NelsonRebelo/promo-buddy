@@ -448,9 +448,6 @@ const Runner = () => {
                         </div>
 
                         <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50/80 p-2.5">
-                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-                            Serviço Independente
-                          </p>
                           {PROMOTION_OPTIONS.filter((option) => option.id === EXPORT_OLX_ID).map((option) => (
                             <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-sky-100/60">
                               <Checkbox
@@ -464,9 +461,7 @@ const Runner = () => {
                           ))}
                         </div>
 
-                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Promoções Regulares
-                        </p>
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Destaques</p>
                         <div className="h-[248px] space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
                           {PROMOTION_OPTIONS.filter((option) => option.id !== EXPORT_OLX_ID).map((option) => (
                             <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-slate-50">
