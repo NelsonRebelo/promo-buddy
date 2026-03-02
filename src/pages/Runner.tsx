@@ -447,20 +447,26 @@ const Runner = () => {
                           </Button>
                         </div>
 
-                        <div className="mb-2 rounded-lg border border-white/80 bg-white p-2">
+                        <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50/80 p-2.5">
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                            Serviço Independente
+                          </p>
                           {PROMOTION_OPTIONS.filter((option) => option.id === EXPORT_OLX_ID).map((option) => (
-                            <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-slate-50">
+                            <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-sky-100/60">
                               <Checkbox
                                 checked={manualPromotionIds.includes(option.id)}
                                 onCheckedChange={(checked) => togglePromotion(option.id, checked === true)}
                                 disabled={running}
                               />
-                              <span>{option.name}</span>
+                              <span className="font-medium">{option.name}</span>
                               <span className="text-xs text-muted-foreground">({option.id})</span>
                             </label>
                           ))}
                         </div>
 
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Promoções Regulares
+                        </p>
                         <div className="h-[248px] space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
                           {PROMOTION_OPTIONS.filter((option) => option.id !== EXPORT_OLX_ID).map((option) => (
                             <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-slate-50">
