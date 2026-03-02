@@ -33,7 +33,6 @@ const OfferPromotionResult = () => {
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Offer Promotion Under Construction</h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            We are finalizing a secure flow to retrieve required data from external login. This section will be available soon.
           </p>
         </div>
       </main>
