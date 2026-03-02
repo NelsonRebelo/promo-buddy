@@ -496,12 +496,9 @@ const Runner = () => {
 
           <Card className="glass rounded-3xl border-white/75 xl:sticky xl:top-24 xl:h-fit">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold tracking-tight">Run Control</CardTitle>
+              <CardTitle className="text-lg font-semibold tracking-tight">Run Promotion Resquests</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Process requests with controlled concurrency and live feedback.
-              </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rows</p>
