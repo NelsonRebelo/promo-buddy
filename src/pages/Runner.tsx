@@ -493,8 +493,8 @@ const Runner = () => {
             <CardHeader className="pb-3 text-center">
               <CardTitle className="text-lg font-semibold tracking-tight">Run Promotion Requests</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid grid-cols-3 gap-2">
+            <CardContent className="flex flex-col items-center space-y-5 text-center">
+              <div className="grid w-full grid-cols-3 gap-2">
                 <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rows</p>
                   <p className="text-lg font-semibold">{rows.length}</p>
@@ -508,7 +508,7 @@ const Runner = () => {
                   <p className="text-lg font-semibold">{Math.round(progress)}</p>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="w-full max-w-xs space-y-2">
                 <Button
                   onClick={run}
                   disabled={running || rows.length === 0}
