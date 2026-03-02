@@ -490,8 +490,8 @@ const Runner = () => {
           </div>
 
           <Card className="glass rounded-3xl border-white/75 xl:sticky xl:top-24 xl:h-fit">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold tracking-tight">Run Promotion Resquests</CardTitle>
+            <CardHeader className="pb-3 text-center">
+              <CardTitle className="text-lg font-semibold tracking-tight">Run Promotion Requests</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-3 gap-2">
