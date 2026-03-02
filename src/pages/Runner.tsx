@@ -67,6 +67,7 @@ const PROMOTION_OPTIONS: PromotionOption[] = [
   { name: "Pacote Medium", id: "298" },
   { name: "Pacote Large", id: "192" },
 ];
+const EXPORT_OLX_ID = "49";
 
 function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -446,8 +447,22 @@ const Runner = () => {
                           </Button>
                         </div>
 
+                        <div className="mb-2 rounded-lg border border-white/80 bg-white p-2">
+                          {PROMOTION_OPTIONS.filter((option) => option.id === EXPORT_OLX_ID).map((option) => (
+                            <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-slate-50">
+                              <Checkbox
+                                checked={manualPromotionIds.includes(option.id)}
+                                onCheckedChange={(checked) => togglePromotion(option.id, checked === true)}
+                                disabled={running}
+                              />
+                              <span>{option.name}</span>
+                              <span className="text-xs text-muted-foreground">({option.id})</span>
+                            </label>
+                          ))}
+                        </div>
+
                         <div className="h-[248px] space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
-                          {PROMOTION_OPTIONS.map((option) => (
+                          {PROMOTION_OPTIONS.filter((option) => option.id !== EXPORT_OLX_ID).map((option) => (
                             <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-slate-50">
                               <Checkbox
                                 checked={manualPromotionIds.includes(option.id)}
