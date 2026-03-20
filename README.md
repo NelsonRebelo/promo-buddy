@@ -1,1 +1,45 @@
+# Promo Buddy
 
+Web frontend for Promo Buddy.
+
+## Environment
+
+Required frontend variables:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+The app calls the Supabase Edge Function at `/functions/v1/vas-api`, so production also depends on:
+
+- Supabase project being live
+- `vas-api` function deployed
+- required Supabase server secrets configured for that function
+- database migration applied
+
+## Local run
+
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Hosting
+
+Recommended:
+
+- Vercel
+- Netlify
+
+This repo includes SPA rewrite config for both:
+
+- [vercel.json](/tmp/promo-buddy-web-check/vercel.json)
+- [netlify.toml](/tmp/promo-buddy-web-check/netlify.toml)
+
+GitHub Pages is not the best fit because this app uses client-side routing and runtime environment variables.
