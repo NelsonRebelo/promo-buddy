@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,7 +23,6 @@ import {
   Play,
   Upload,
   X,
-  XCircle,
 } from "lucide-react";
 import { getStatus, sendVas, logout } from "@/lib/api";
 
@@ -134,7 +132,12 @@ const Runner = () => {
   const [manualAdvertsText, setManualAdvertsText] = useState("");
   const [manualPromotionIds, setManualPromotionIds] = useState<string[]>([]);
   const [manualError, setManualError] = useState("");
+  const [rowsPage, setRowsPage] = useState(1);
+  const [failuresPage, setFailuresPage] = useState(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef(false);
+  const ROWS_PER_PAGE = 10;
+  const FAILURES_PER_PAGE = 8;
 
   useEffect(() => {
     getStatus()
@@ -154,6 +157,8 @@ const Runner = () => {
     setResults([]);
     setDone(false);
     setCompleted(0);
+    setRowsPage(1);
+    setFailuresPage(1);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -199,6 +204,8 @@ const Runner = () => {
     setResults([]);
     setDone(false);
     setCompleted(0);
+    setRowsPage(1);
+    setFailuresPage(1);
     setManualAdvertsText("");
     setManualPromotionIds([]);
   };
@@ -287,9 +294,25 @@ const Runner = () => {
   const failCount = results.filter((r) => !r.success).length;
   const failures = results.filter((r) => !r.success);
   const progress = rows.length > 0 ? (completed / rows.length) * 100 : 0;
+  const totalRowsPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const totalFailurePages = Math.max(1, Math.ceil(failures.length / FAILURES_PER_PAGE));
+  const paginatedRows = rows.slice((rowsPage - 1) * ROWS_PER_PAGE, rowsPage * ROWS_PER_PAGE);
+  const paginatedFailures = failures.slice(
+    (failuresPage - 1) * FAILURES_PER_PAGE,
+    failuresPage * FAILURES_PER_PAGE,
+  );
 
   return (
-    <div className="min-h-screen pb-10">
+    <div className="relative min-h-screen overflow-hidden pb-10">
+      <div aria-hidden className="brand-blue-stage pointer-events-none absolute inset-0">
+        <img
+          src="https://media.licdn.com/dms/image/v2/C4D1BAQH4PUv6QKg_Ag/company-background_10000/company-background_10000/0/1591019721058/standvirtual_cover?e=1774620000&v=beta&t=h0xHSH-64Du6zwOfe6CHUOdTQiqF0_xx7Dvb8fEs2ig"
+          alt=""
+          className="h-full w-full scale-105 object-cover object-center blur-md saturate-[1.05]"
+        />
+        <div className="brand-blue-overlay" />
+      </div>
+
       <header className="sticky top-0 z-50 border-b border-white/70 bg-white/72 backdrop-blur-xl">
         <div className="section-shell flex h-16 items-center justify-between">
           <Button type="button" variant="ghost" size="sm" onClick={handleBack} className="rounded-full px-3">
@@ -309,33 +332,47 @@ const Runner = () => {
         </div>
       </header>
 
-      <main className="section-shell mt-8 space-y-8 pb-6">
+      <main className="section-shell relative mt-8 space-y-8 pb-6">
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
-            <Card className="glass rounded-3xl border-white/75">
+            <Card className="glass rounded-[2rem] border-white/80 bg-white/84 shadow-lg">
               <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-semibold tracking-tight">Upload CSV</CardTitle>
+                <CardTitle className="text-xl font-semibold tracking-tight">Add Adverts Manually</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
-                <Alert className="rounded-2xl border-amber-200 bg-amber-50/90 text-amber-900">
+                <Alert className="rounded-2xl border-amber-200 bg-amber-50/92 text-amber-900">
                   <AlertDescription>
                     The VAS you are about to add is paid by the client. Be cautious and sure of what you are doing
                   </AlertDescription>
                 </Alert>
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <Input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleFile}
-                      disabled={running}
-                      className="h-11 max-w-full rounded-xl bg-white/90 sm:max-w-sm"
-                    />
-                    <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                      <Upload className="h-4 w-4" strokeWidth={1.8} />
-                      <span>Headers required: advert, promotion</span>
-                    </div>
-                  </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFile}
+                  disabled={running}
+                  className="hidden"
+                />
+
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={running}
+                    className="h-9 rounded-full border-white/80 bg-white/80 px-4 text-sm"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload CSV
+                  </Button>
+                  <Button type="button" onClick={addManualRows} disabled={running} className="h-9 rounded-full px-4">
+                    Add
+                  </Button>
+                </div>
+
+                <div className="rounded-2xl border border-dashed border-sky-200/80 bg-sky-50/55 px-4 py-3 text-sm text-slate-600">
+                  Headers required: advert, promotion
                 </div>
 
                 {csvError && (
@@ -344,70 +381,15 @@ const Runner = () => {
                   </Alert>
                 )}
 
-                {rows.length > 0 && (
-                  <>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {rows.length} row{rows.length !== 1 ? "s" : ""} loaded
-                    </p>
-                    <div className="overflow-hidden rounded-2xl border border-white/70 bg-white/75">
-                      <div className="max-h-72 overflow-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="hover:bg-transparent">
-                              <TableHead className="w-14">#</TableHead>
-                              <TableHead>Advert</TableHead>
-                              <TableHead>Promotion</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {rows.slice(0, 20).map((r, i) => (
-                              <TableRow key={i} className="transition-colors hover:bg-white/70">
-                                <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                                <TableCell>{r.advert}</TableCell>
-                                <TableCell>
-                                  {getPromotionLabel(r.promotion) ? (
-                                    <span>
-                                      {getPromotionLabel(r.promotion)}{" "}
-                                      <span className="text-xs text-muted-foreground">({r.promotion})</span>
-                                    </span>
-                                  ) : (
-                                    r.promotion
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                    {rows.length > 20 && (
-                      <p className="text-xs text-muted-foreground">Showing first 20 of {rows.length} rows</p>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="glass rounded-3xl border-white/75">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-semibold tracking-tight">Add Adverts Manually</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-end">
-                  <Button type="button" onClick={addManualRows} disabled={running} className="h-9 rounded-lg px-4">
-                    Add
-                  </Button>
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-white/80 bg-white/85">
-                  <div className="grid grid-cols-1 border-b border-white/80 bg-white/90 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid-cols-2">
+                <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/88 shadow-sm">
+                  <div className="grid grid-cols-1 border-b border-white/80 bg-white/92 text-xs font-semibold tracking-wide text-muted-foreground sm:grid-cols-2">
                     <div className="px-3 py-2">Advert IDs</div>
                     <div className="border-t border-white/80 px-3 py-2 sm:border-l sm:border-t-0">Promotions</div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2">
                     <div className="p-3">
-                      <div className="h-full rounded-lg border border-slate-200 bg-white/95 p-2">
+                      <div className="h-full rounded-xl border border-sky-100 bg-white/96 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                         <Label htmlFor="manual-advert" className="sr-only">
                           Advert IDs
                         </Label>
@@ -417,13 +399,13 @@ const Runner = () => {
                           value={manualAdvertsText}
                           onChange={(e) => setManualAdvertsText(e.target.value)}
                           disabled={running}
-                          className="h-[300px] rounded-lg border-white/80 bg-white"
+                          className="h-[300px] rounded-xl border-white/80 bg-white"
                         />
                       </div>
                     </div>
 
                     <div className="border-t border-white/80 p-3 sm:border-l sm:border-t-0">
-                      <div className="h-full rounded-lg border border-slate-200 bg-white/95 p-2">
+                      <div className="h-full rounded-xl border border-sky-100 bg-white/96 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                         <div className="mb-2 flex items-center gap-2">
                           <Button
                             type="button"
@@ -461,7 +443,7 @@ const Runner = () => {
                           ))}
                         </div>
 
-                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Destaques</p>
+                        <p className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">Destaques</p>
                         <div className="h-[248px] space-y-2 overflow-auto rounded-lg border border-white/80 bg-white p-2">
                           {PROMOTION_OPTIONS.filter((option) => option.id !== EXPORT_OLX_ID).map((option) => (
                             <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-slate-50">
@@ -485,26 +467,99 @@ const Runner = () => {
                     <AlertDescription>{manualError}</AlertDescription>
                   </Alert>
                 )}
+
+                {rows.length > 0 && (
+                  <div className="space-y-3 rounded-2xl border border-white/80 bg-white/84 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {rows.length} row{rows.length !== 1 ? "s" : ""} loaded
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Page {rowsPage} of {totalRowsPages}
+                      </p>
+                    </div>
+                    <div className="overflow-hidden rounded-2xl border border-white/75 bg-white/80">
+                      <div className="overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="w-14">#</TableHead>
+                              <TableHead>Advert</TableHead>
+                              <TableHead>Promotion</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {paginatedRows.map((r, i) => (
+                              <TableRow key={`${r.advert}-${r.promotion}-${i}`} className="transition-colors hover:bg-white/70">
+                                <TableCell className="text-muted-foreground">
+                                  {(rowsPage - 1) * ROWS_PER_PAGE + i + 1}
+                                </TableCell>
+                                <TableCell>{r.advert}</TableCell>
+                                <TableCell>
+                                  {getPromotionLabel(r.promotion) ? (
+                                    <span>
+                                      {getPromotionLabel(r.promotion)}{" "}
+                                      <span className="text-xs text-muted-foreground">({r.promotion})</span>
+                                    </span>
+                                  ) : (
+                                    r.promotion
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                    {totalRowsPages > 1 && (
+                      <div className="flex items-center justify-between gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          disabled={rowsPage === 1}
+                          onClick={() => setRowsPage((page) => Math.max(1, page - 1))}
+                        >
+                          Previous
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Showing {paginatedRows.length} of {rows.length}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          disabled={rowsPage === totalRowsPages}
+                          onClick={() => setRowsPage((page) => Math.min(totalRowsPages, page + 1))}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
           <Card className="glass rounded-3xl border-white/75 xl:sticky xl:top-24 xl:h-fit">
             <CardHeader className="pb-3 text-center">
-              <CardTitle className="text-lg font-semibold tracking-tight">Run Promotion Requests</CardTitle>
+              <CardTitle className="text-lg font-semibold tracking-tight">Run promotion requests</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center space-y-5 text-center">
               <div className="grid w-full grid-cols-3 gap-2">
                 <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rows</p>
+                  <p className="text-[11px] tracking-wide text-muted-foreground">Rows</p>
                   <p className="text-lg font-semibold">{rows.length}</p>
                 </div>
                 <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">%</p>
+                  <p className="text-[11px] tracking-wide text-muted-foreground">%</p>
                   <p className="text-lg font-semibold">{Math.round(progress)}</p>
                 </div>
                 <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Done</p>
+                  <p className="text-[11px] tracking-wide text-muted-foreground">Done</p>
                   <p className="text-lg font-semibold">{completed}</p>
                 </div>
               </div>
@@ -559,15 +614,15 @@ const Runner = () => {
               <Progress value={progress} className="h-2.5 rounded-full" />
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/75 bg-white/70 p-3 text-center">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Total</p>
+                  <p className="text-xs tracking-wide text-muted-foreground">Total</p>
                   <p className="mt-1 text-2xl font-semibold">{results.length}</p>
                 </div>
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-3 text-center text-emerald-700">
-                  <p className="text-xs uppercase tracking-wide">Success</p>
+                  <p className="text-xs tracking-wide">Success</p>
                   <p className="mt-1 text-2xl font-semibold">{successCount}</p>
                 </div>
                 <div className="rounded-2xl border border-rose-100 bg-rose-50/80 p-3 text-center text-rose-700">
-                  <p className="text-xs uppercase tracking-wide">Failed</p>
+                  <p className="text-xs tracking-wide">Failed</p>
                   <p className="mt-1 text-2xl font-semibold">{failCount}</p>
                 </div>
               </div>
@@ -578,11 +633,11 @@ const Runner = () => {
         {done && (
           <Card className="glass rounded-3xl border-white/75">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold tracking-tight">Results Summary</CardTitle>
+              <CardTitle className="text-lg font-semibold tracking-tight">Results summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {failures.length > 0 && (
-                <div className="overflow-hidden rounded-2xl border border-white/75 bg-white/72">
+                <div className="space-y-3 overflow-hidden rounded-2xl border border-white/75 bg-white/72 p-0">
                   <div className="overflow-auto">
                     <Table>
                       <TableHeader>
@@ -593,7 +648,7 @@ const Runner = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {failures.map((f, i) => (
+                        {paginatedFailures.map((f, i) => (
                           <TableRow key={i} className="transition-colors hover:bg-white/70">
                             <TableCell>{f.advert}</TableCell>
                             <TableCell>{getPromotionLabel(f.promotion) || f.promotion}</TableCell>
@@ -605,6 +660,33 @@ const Runner = () => {
                       </TableBody>
                     </Table>
                   </div>
+                  {totalFailurePages > 1 && (
+                    <div className="flex items-center justify-between gap-3 px-4 pb-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                        disabled={failuresPage === 1}
+                        onClick={() => setFailuresPage((page) => Math.max(1, page - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Page {failuresPage} of {totalFailurePages}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                        disabled={failuresPage === totalFailurePages}
+                        onClick={() => setFailuresPage((page) => Math.min(totalFailurePages, page + 1))}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -626,7 +708,7 @@ const Runner = () => {
                 className="h-11 rounded-xl border-white/80 bg-white/60 px-5 hover:bg-white/85"
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Upload New CSV
+                Upload new CSV
               </Button>
             </CardContent>
           </Card>
