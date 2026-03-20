@@ -320,7 +320,11 @@ const Runner = () => {
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             Back
           </Button>
-          <span className="text-sm font-medium text-muted-foreground">Promo Buddy</span>
+          <img
+            src="/promobuddy-logo.png"
+            alt="Promo Buddy"
+            className="h-9 w-auto rounded-full object-contain"
+          />
           <Button
             variant="ghost"
             size="sm"
@@ -387,7 +391,7 @@ const Runner = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2">
                     <div className="p-3">
-                      <div className="h-full rounded-xl border border-sky-100 bg-white/96 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                      <div className="h-[372px] rounded-xl border border-sky-100 bg-white/96 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                         <Label htmlFor="manual-advert" className="sr-only">
                           Advert IDs
                         </Label>
@@ -397,13 +401,13 @@ const Runner = () => {
                           value={manualAdvertsText}
                           onChange={(e) => setManualAdvertsText(e.target.value)}
                           disabled={running}
-                          className="h-[300px] rounded-xl border-white/80 bg-white"
+                          className="h-full overflow-y-auto rounded-xl border-white/80 bg-white"
                         />
                       </div>
                     </div>
 
                     <div className="border-t border-white/80 p-3 sm:border-l sm:border-t-0">
-                      <div className="h-full rounded-xl border border-sky-100 bg-white/96 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                      <div className="h-[372px] rounded-xl border border-sky-100 bg-white/96 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                         <div className="mb-2 flex items-center gap-2">
                           <Button
                             type="button"
@@ -706,7 +710,7 @@ const Runner = () => {
                 className="h-11 rounded-xl border-white/80 bg-white/60 px-5 hover:bg-white/85"
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Upload new CSV
+                Run Again
               </Button>
             </CardContent>
           </Card>
