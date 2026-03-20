@@ -549,7 +549,7 @@ const Runner = () => {
             </Card>
           </div>
 
-          <Card className="glass rounded-3xl border-white/75 xl:sticky xl:top-24 xl:h-fit">
+          <Card className="glass rounded-3xl border-white/75 lg:sticky lg:top-24 lg:h-fit lg:self-start">
             <CardHeader className="pb-3 text-center">
               <CardTitle className="text-lg font-semibold tracking-tight">Run promotion requests</CardTitle>
             </CardHeader>
