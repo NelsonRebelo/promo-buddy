@@ -41,12 +41,8 @@ const Index = () => {
       </div>
 
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
-        <div className="section-shell flex h-14 items-center">
-          <img
-            src="/promobuddy-logo.png"
-            alt="Promo Buddy"
-            className="h-10 w-auto rounded-full object-contain"
-          />
+        <div className="section-shell flex h-14 items-center justify-center">
+          <span className="text-sm font-medium text-muted-foreground">Promo Buddy</span>
         </div>
       </header>
 
