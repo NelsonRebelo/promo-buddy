@@ -1,4 +1,9 @@
-const ALLOWED_IPS = new Set(["52.212.235.52"]);
+const ALLOWED_IPS = new Set([
+  "52.212.235.52",
+  "18.200.137.205",
+  "54.77.44.130",
+  "3.254.33.109",
+]);
 
 function renderDeniedPage(ip) {
   const ipLabel = ip || "unknown";

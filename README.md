@@ -48,6 +48,9 @@ GitHub Pages is not the best fit because this app uses client-side routing and r
 
 Production access is restricted at the hosting edge to this IP:
 
-- `52.212.235.52`
+- `52.212.235.52/32`
+- `18.200.137.205/32`
+- `54.77.44.130/32`
+- `3.254.33.109/32`
 
 Blocked visitors receive an `Access Denied` page before the React app loads.
