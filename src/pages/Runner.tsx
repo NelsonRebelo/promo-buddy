@@ -549,7 +549,10 @@ const Runner = () => {
             </Card>
           </div>
 
-          <Card className="glass rounded-3xl border-white/75 lg:sticky lg:top-24 lg:h-fit lg:self-start">
+          <Card
+            className="glass rounded-3xl border-white/75 lg:sticky lg:h-fit lg:self-start"
+            style={{ top: "max(6rem, calc(100vh - 24rem))" }}
+          >
             <CardHeader className="pb-3 text-center">
               <CardTitle className="text-lg font-semibold tracking-tight">Run promotion requests</CardTitle>
             </CardHeader>
