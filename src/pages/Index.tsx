@@ -31,13 +31,13 @@ const Index = () => {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
+      <div aria-hidden className="brand-blue-stage pointer-events-none absolute inset-0">
         <img
-          src="https://media.licdn.com/dms/image/v2/C4D1BAQH4PUv6QKg_Ag/company-background_10000/company-background_10000/0/1591019721058/standvirtual_cover?e=1772942400&v=beta&t=Pb1KZ6O_5v6YZDtU4JFVwJ99EWiYEkzDRkaHG6aj8vo"
+          src="https://media.licdn.com/dms/image/v2/C4D1BAQH4PUv6QKg_Ag/company-background_10000/company-background_10000/0/1591019721058/standvirtual_cover?e=1774620000&v=beta&t=h0xHSH-64Du6zwOfe6CHUOdTQiqF0_xx7Dvb8fEs2ig"
           alt=""
-          className="h-full w-full scale-105 object-cover blur-sm"
+          className="h-full w-full scale-105 object-cover blur-md saturate-[1.05]"
         />
-        <div className="absolute inset-0 bg-white/62" />
+        <div className="brand-blue-overlay" />
       </div>
 
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">

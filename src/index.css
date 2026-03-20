@@ -125,6 +125,43 @@
     box-shadow: var(--shadow-sm);
   }
 
+  .brand-blue-stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .brand-blue-stage::before {
+    content: "";
+    position: absolute;
+    inset: -4%;
+    background:
+      linear-gradient(180deg, hsl(208 80% 44% / 0.92), hsl(210 82% 45% / 0.88)),
+      radial-gradient(circle at 52% 64%, hsl(209 95% 74% / 0.28), transparent 22%);
+    filter: saturate(1.06);
+  }
+
+  .brand-blue-stage::after {
+    content: "";
+    position: absolute;
+    inset: -8% -14% -16% 36%;
+    background:
+      linear-gradient(145deg, hsl(207 83% 74% / 0.22), hsl(210 85% 74% / 0.04) 52%),
+      linear-gradient(145deg, transparent 8%, hsl(206 80% 82% / 0.18) 24%, transparent 52%),
+      linear-gradient(145deg, transparent 22%, hsl(208 78% 85% / 0.12) 38%, transparent 62%);
+    transform: skewX(-24deg);
+    filter: blur(1px);
+    opacity: 0.92;
+  }
+
+  .brand-blue-overlay {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 50% 56%, hsl(206 92% 84% / 0.22), transparent 16%),
+      linear-gradient(180deg, hsl(207 92% 42% / 0.24), hsl(212 78% 97% / 0.66));
+  }
+
   .section-shell {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
   }
