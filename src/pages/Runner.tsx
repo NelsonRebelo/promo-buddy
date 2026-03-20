@@ -559,16 +559,16 @@ const Runner = () => {
             <CardContent className="flex flex-col items-center space-y-5 text-center">
               <div className="grid w-full grid-cols-3 gap-2">
                 <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
-                  <p className="text-[11px] tracking-wide text-muted-foreground">Rows</p>
-                  <p className="text-lg font-semibold">{rows.length}</p>
+                  <p className="text-[11px] tracking-wide text-muted-foreground">Progress</p>
+                  <p className="text-lg font-semibold">{Math.round(progress)}%</p>
                 </div>
-                <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
-                  <p className="text-[11px] tracking-wide text-muted-foreground">%</p>
-                  <p className="text-lg font-semibold">{Math.round(progress)}</p>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-2 text-center text-emerald-700">
+                  <p className="text-[11px] tracking-wide">Success</p>
+                  <p className="text-lg font-semibold">{successCount}</p>
                 </div>
-                <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
-                  <p className="text-[11px] tracking-wide text-muted-foreground">Done</p>
-                  <p className="text-lg font-semibold">{completed}</p>
+                <div className="rounded-xl border border-rose-100 bg-rose-50/80 p-2 text-center text-rose-700">
+                  <p className="text-[11px] tracking-wide">Failed</p>
+                  <p className="text-lg font-semibold">{failCount}</p>
                 </div>
               </div>
               <div className="w-full max-w-xs space-y-2">
