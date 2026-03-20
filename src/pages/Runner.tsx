@@ -299,14 +299,6 @@ const Runner = () => {
     navigate("/", { replace: true });
   };
 
-  if (checking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const successCount = results.filter((r) => r.success).length;
   const failCount = results.filter((r) => !r.success).length;
   const failures = results.filter((r) => !r.success);
@@ -324,6 +316,14 @@ const Runner = () => {
 
     failedDetailsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [done, progress]);
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden pb-10">
