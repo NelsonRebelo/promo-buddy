@@ -47,26 +47,26 @@ const Index = () => {
       </header>
 
       <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center py-10 sm:py-16">
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-4xl">
           <img
-            src="/promobuddy-logo.png"
+            src="/promobuddy-home-logo.png"
             alt="Promo Buddy"
-            className="mx-auto mb-5 h-24 w-auto rounded-[1.5rem] object-contain"
+            className="mx-auto mb-6 h-28 w-auto object-contain"
           />
           <Card className="glass w-full rounded-3xl border-white/80">
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <Button asChild className="h-12 rounded-xl text-sm font-medium shadow-sm">
-              <Link to="/login">Investment promotion</Link>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12 rounded-xl border-white/80 bg-white/70 text-sm"
-              onClick={openOfferLoginPopup}
-            >
-              Offer Promotion
-            </Button>
-          </CardContent>
+            <CardContent className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button asChild className="h-12 w-full max-w-sm rounded-xl text-sm font-medium shadow-sm">
+                <Link to="/login">Investment promotion</Link>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 w-full max-w-sm rounded-xl border-white/80 bg-white/70 text-sm"
+                onClick={openOfferLoginPopup}
+              >
+                Offer Promotion
+              </Button>
+            </CardContent>
           </Card>
         </div>
       </main>
