@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 const STORAGE_KEY = "offer_token_info";
@@ -52,14 +52,12 @@ const Index = () => {
 
       <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center py-10 sm:py-16">
         <Card className="glass w-full max-w-2xl rounded-3xl border-white/80">
-          <CardHeader className="space-y-2 pb-4 text-center">
+          <CardHeader className="pb-4 text-center">
             <img
               src="/promobuddy-logo.png"
               alt="Promo Buddy"
-              className="mx-auto mb-2 h-16 w-auto rounded-[1.25rem] object-contain"
+              className="mx-auto h-16 w-auto rounded-[1.25rem] object-contain"
             />
-            <CardTitle className="text-3xl font-semibold tracking-tight">Choose Promotion Type</CardTitle>
-            <CardDescription>Select how you want to proceed.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <Button asChild className="h-12 rounded-xl text-sm font-medium shadow-sm">
