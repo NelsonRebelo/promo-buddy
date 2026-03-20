@@ -308,9 +308,10 @@ const Runner = () => {
         <img
           src="https://media.licdn.com/dms/image/v2/C4D1BAQH4PUv6QKg_Ag/company-background_10000/company-background_10000/0/1591019721058/standvirtual_cover?e=1774620000&v=beta&t=h0xHSH-64Du6zwOfe6CHUOdTQiqF0_xx7Dvb8fEs2ig"
           alt=""
-          className="h-full w-full scale-105 object-cover object-center blur-md saturate-[1.05]"
+          className="h-full w-full scale-[1.02] object-cover object-center opacity-35 blur-xl saturate-[0.92]"
         />
-        <div className="brand-blue-overlay" />
+        <div className="brand-blue-overlay opacity-70" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.5),rgba(241,247,255,0.82)_28%,rgba(246,249,253,0.94)_100%)]" />
       </div>
 
       <header className="sticky top-0 z-50 border-b border-white/70 bg-white/72 backdrop-blur-xl">
@@ -340,11 +341,12 @@ const Runner = () => {
                 <CardTitle className="text-xl font-semibold tracking-tight">Add Adverts Manually</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
-                <Alert className="rounded-2xl border-amber-200 bg-amber-50/92 text-amber-900">
-                  <AlertDescription>
+                <div className="rounded-2xl border border-sky-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(239,246,255,0.88))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                  <p className="mb-1 text-sm font-semibold text-slate-800">Warning</p>
+                  <p className="text-sm leading-6 text-slate-600">
                     The VAS you are about to add is paid by the client. Be cautious and sure of what you are doing
-                  </AlertDescription>
-                </Alert>
+                  </p>
+                </div>
 
                 <input
                   ref={fileInputRef}
@@ -369,10 +371,6 @@ const Runner = () => {
                   <Button type="button" onClick={addManualRows} disabled={running} className="h-9 rounded-full px-4">
                     Add
                   </Button>
-                </div>
-
-                <div className="rounded-2xl border border-dashed border-sky-200/80 bg-sky-50/55 px-4 py-3 text-sm text-slate-600">
-                  Headers required: advert, promotion
                 </div>
 
                 {csvError && (
