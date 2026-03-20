@@ -43,3 +43,11 @@ This repo includes SPA rewrite config for both:
 - [netlify.toml](/tmp/promo-buddy-web-check/netlify.toml)
 
 GitHub Pages is not the best fit because this app uses client-side routing and runtime environment variables.
+
+## IP allowlist
+
+Production access is restricted at the hosting edge to this IP:
+
+- `52.212.235.52`
+
+Blocked visitors receive an `Access Denied` page before the React app loads.
