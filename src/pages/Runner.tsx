@@ -399,8 +399,11 @@ const Runner = () => {
                           id="manual-advert"
                           placeholder={"809343445\n809234234\n..."}
                           value={manualAdvertsText}
-                          onChange={(e) => setManualAdvertsText(e.target.value)}
+                          onChange={(e) =>
+                            setManualAdvertsText(e.target.value.replace(/[^\d\r\n]/g, ""))
+                          }
                           disabled={running}
+                          inputMode="numeric"
                           className="h-full overflow-y-auto rounded-xl border-white/80 bg-white"
                         />
                       </div>
