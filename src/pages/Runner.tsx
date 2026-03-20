@@ -337,9 +337,9 @@ const Runner = () => {
         </div>
       </header>
 
-      <main className="section-shell relative mt-8 space-y-8 pb-6">
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="space-y-6">
+      <main className="section-shell relative mt-8 pb-6">
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-8">
             <Card className="glass rounded-[2rem] border-white/80 bg-white/84 shadow-lg">
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl font-semibold tracking-tight">Add Adverts Manually</CardTitle>
@@ -547,180 +547,178 @@ const Runner = () => {
                 )}
               </CardContent>
             </Card>
-          </div>
-
-          <Card
-            className="glass rounded-3xl border-white/75 lg:sticky lg:h-fit lg:self-start"
-            style={{ top: "max(6rem, calc(100vh - 24rem))" }}
-          >
-            <CardHeader className="pb-3 text-center">
-              <CardTitle className="text-lg font-semibold tracking-tight">Run promotion requests</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center space-y-5 text-center">
-              <div className="grid w-full grid-cols-3 gap-2">
-                <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
-                  <p className="text-[11px] tracking-wide text-muted-foreground">Progress</p>
-                  <p className="text-lg font-semibold">{Math.round(progress)}%</p>
-                </div>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-2 text-center text-emerald-700">
-                  <p className="text-[11px] tracking-wide">Success</p>
-                  <p className="text-lg font-semibold">{successCount}</p>
-                </div>
-                <div className="rounded-xl border border-rose-100 bg-rose-50/80 p-2 text-center text-rose-700">
-                  <p className="text-[11px] tracking-wide">Failed</p>
-                  <p className="text-lg font-semibold">{failCount}</p>
-                </div>
-              </div>
-              <div className="w-full max-w-xs space-y-2">
-                <Button
-                  onClick={run}
-                  disabled={running || rows.length === 0}
-                  className="h-11 w-full rounded-xl text-sm shadow-sm transition-all duration-300 hover:shadow-md"
-                >
-                  {running ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-2 h-4 w-4" />
-                      Run
-                    </>
-                  )}
-                </Button>
-
-                {running && (
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      cancelRef.current = true;
-                    }}
-                    className="h-11 w-full rounded-xl"
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {(running || done) && (
-          <Card className="glass rounded-3xl border-white/75">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold tracking-tight">Progress</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>
-                  {completed} / {rows.length} processed
-                </span>
-                <span>{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} className="h-2.5 rounded-full" />
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/75 bg-white/70 p-3 text-center">
-                  <p className="text-xs tracking-wide text-muted-foreground">Total</p>
-                  <p className="mt-1 text-2xl font-semibold">{results.length}</p>
-                </div>
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-3 text-center text-emerald-700">
-                  <p className="text-xs tracking-wide">Success</p>
-                  <p className="mt-1 text-2xl font-semibold">{successCount}</p>
-                </div>
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/80 p-3 text-center text-rose-700">
-                  <p className="text-xs tracking-wide">Failed</p>
-                  <p className="mt-1 text-2xl font-semibold">{failCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {done && (
-          <Card className="glass rounded-3xl border-white/75">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold tracking-tight">Results summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {failures.length > 0 && (
-                <div className="space-y-3 overflow-hidden rounded-2xl border border-white/75 bg-white/72 p-0">
-                  <div className="overflow-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="hover:bg-transparent">
-                          <TableHead>Advert</TableHead>
-                          <TableHead>Promotion</TableHead>
-                          <TableHead>Message</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedFailures.map((f, i) => (
-                          <TableRow key={i} className="transition-colors hover:bg-white/70">
-                            <TableCell>{f.advert}</TableCell>
-                            <TableCell>{getPromotionLabel(f.promotion) || f.promotion}</TableCell>
-                            <TableCell className="max-w-xs truncate text-sm">
-                              {getParsedMessage(f.errorMessage)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+            {(running || done) && (
+              <Card className="glass rounded-3xl border-white/75">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold tracking-tight">Progress</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      {completed} / {rows.length} processed
+                    </span>
+                    <span>{Math.round(progress)}%</span>
                   </div>
-                  {totalFailurePages > 1 && (
-                    <div className="flex items-center justify-between gap-3 px-4 pb-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        disabled={failuresPage === 1}
-                        onClick={() => setFailuresPage((page) => Math.max(1, page - 1))}
-                      >
-                        Previous
-                      </Button>
-                      <p className="text-xs text-muted-foreground">
-                        Page {failuresPage} of {totalFailurePages}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        disabled={failuresPage === totalFailurePages}
-                        onClick={() => setFailuresPage((page) => Math.min(totalFailurePages, page + 1))}
-                      >
-                        Next
-                      </Button>
+                  <Progress value={progress} className="h-2.5 rounded-full" />
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-white/75 bg-white/70 p-3 text-center">
+                      <p className="text-xs tracking-wide text-muted-foreground">Total</p>
+                      <p className="mt-1 text-2xl font-semibold">{results.length}</p>
+                    </div>
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-3 text-center text-emerald-700">
+                      <p className="text-xs tracking-wide">Success</p>
+                      <p className="mt-1 text-2xl font-semibold">{successCount}</p>
+                    </div>
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50/80 p-3 text-center text-rose-700">
+                      <p className="text-xs tracking-wide">Failed</p>
+                      <p className="mt-1 text-2xl font-semibold">{failCount}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {done && (
+              <Card className="glass rounded-3xl border-white/75">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-semibold tracking-tight">Results summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {failures.length > 0 && (
+                    <div className="space-y-3 overflow-hidden rounded-2xl border border-white/75 bg-white/72 p-0">
+                      <div className="overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead>Advert</TableHead>
+                              <TableHead>Promotion</TableHead>
+                              <TableHead>Message</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {paginatedFailures.map((f, i) => (
+                              <TableRow key={i} className="transition-colors hover:bg-white/70">
+                                <TableCell>{f.advert}</TableCell>
+                                <TableCell>{getPromotionLabel(f.promotion) || f.promotion}</TableCell>
+                                <TableCell className="max-w-xs truncate text-sm">
+                                  {getParsedMessage(f.errorMessage)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {totalFailurePages > 1 && (
+                        <div className="flex items-center justify-between gap-3 px-4 pb-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full"
+                            disabled={failuresPage === 1}
+                            onClick={() => setFailuresPage((page) => Math.max(1, page - 1))}
+                          >
+                            Previous
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Page {failuresPage} of {totalFailurePages}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full"
+                            disabled={failuresPage === totalFailurePages}
+                            onClick={() => setFailuresPage((page) => Math.min(totalFailurePages, page + 1))}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  {failures.length === 0 && results.length > 0 && (
+                    <Alert className="rounded-2xl border-emerald-200 bg-emerald-50/80 text-emerald-700">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <AlertDescription>All rows completed successfully.</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setRows([]);
+                      setResults([]);
+                      setDone(false);
+                      setCompleted(0);
+                    }}
+                    className="h-11 rounded-xl border-white/80 bg-white/60 px-5 hover:bg-white/85"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Run Again
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <aside className="xl:pl-2">
+            <Card className="glass rounded-3xl border-white/75 lg:sticky lg:top-24 lg:h-fit">
+              <CardHeader className="pb-3 text-center">
+                <CardTitle className="text-lg font-semibold tracking-tight">Run promotion requests</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center space-y-5 text-center">
+                <div className="grid w-full grid-cols-3 gap-2">
+                  <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
+                    <p className="text-[11px] tracking-wide text-muted-foreground">Progress</p>
+                    <p className="text-lg font-semibold">{Math.round(progress)}%</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-2 text-center text-emerald-700">
+                    <p className="text-[11px] tracking-wide">Success</p>
+                    <p className="text-lg font-semibold">{successCount}</p>
+                  </div>
+                  <div className="rounded-xl border border-rose-100 bg-rose-50/80 p-2 text-center text-rose-700">
+                    <p className="text-[11px] tracking-wide">Failed</p>
+                    <p className="text-lg font-semibold">{failCount}</p>
+                  </div>
                 </div>
-              )}
+                <div className="w-full max-w-xs space-y-2">
+                  <Button
+                    onClick={run}
+                    disabled={running || rows.length === 0}
+                    className="h-11 w-full rounded-xl text-sm shadow-sm transition-all duration-300 hover:shadow-md"
+                  >
+                    {running ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Running...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" />
+                        Run
+                      </>
+                    )}
+                  </Button>
 
-              {failures.length === 0 && results.length > 0 && (
-                <Alert className="rounded-2xl border-emerald-200 bg-emerald-50/80 text-emerald-700">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <AlertDescription>All rows completed successfully.</AlertDescription>
-                </Alert>
-              )}
-
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setRows([]);
-                  setResults([]);
-                  setDone(false);
-                  setCompleted(0);
-                }}
-                className="h-11 rounded-xl border-white/80 bg-white/60 px-5 hover:bg-white/85"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Run Again
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+                  {running && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        cancelRef.current = true;
+                      }}
+                      className="h-11 w-full rounded-xl"
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
       </main>
     </div>
   );
