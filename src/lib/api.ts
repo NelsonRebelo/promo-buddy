@@ -1,6 +1,7 @@
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vas-api`;
 const SESSION_KEY = "vas_session_id";
 const OFFER_SESSION_KEY = "offer_session_id";
+const OFFER_MFA_KEY = "offer_mfa_challenge";
 
 function getSessionId(): string | null {
   return localStorage.getItem(SESSION_KEY);
@@ -24,6 +25,40 @@ function setOfferSessionId(id: string) {
 
 function clearOfferSessionId() {
   localStorage.removeItem(OFFER_SESSION_KEY);
+}
+
+export type OfferMfaFactor = {
+  id: string;
+  factorType: string;
+  provider?: string | null;
+  vendorName?: string | null;
+  label?: string | null;
+  verifyHref?: string | null;
+};
+
+export type OfferMfaChallenge = {
+  state_token: string;
+  authorize_url: string;
+  factors: OfferMfaFactor[];
+  preferred_factor_id?: string | null;
+};
+
+function setOfferMfaChallenge(challenge: OfferMfaChallenge) {
+  localStorage.setItem(OFFER_MFA_KEY, JSON.stringify(challenge));
+}
+
+export function getOfferMfaChallenge(): OfferMfaChallenge | null {
+  const raw = localStorage.getItem(OFFER_MFA_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as OfferMfaChallenge;
+  } catch {
+    return null;
+  }
+}
+
+export function clearOfferMfaChallenge() {
+  localStorage.removeItem(OFFER_MFA_KEY);
 }
 
 async function request(path: string, options: RequestInit = {}) {
@@ -121,6 +156,38 @@ export async function offerLogin(data: { username: string; password: string }) {
   if (json.ok && json.offer_session_id) {
     setOfferSessionId(json.offer_session_id);
   }
+  if (json.ok && json.requires_mfa && json.state_token && json.authorize_url) {
+    setOfferMfaChallenge({
+      state_token: json.state_token,
+      authorize_url: json.authorize_url,
+      factors: Array.isArray(json.factors) ? json.factors : [],
+      preferred_factor_id: json.preferred_factor_id ?? null,
+    });
+  }
+  return json;
+}
+
+export async function offerVerifyMfa(data: {
+  state_token: string;
+  authorize_url: string;
+  factor_id: string;
+}) {
+  const res = await offerRequest("/offer/verify-mfa", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: json.error || json.message || `HTTP ${res.status}`,
+      detail: json.detail,
+    };
+  }
+  if (json.ok && json.offer_session_id) {
+    setOfferSessionId(json.offer_session_id);
+    clearOfferMfaChallenge();
+  }
   return json;
 }
 
@@ -131,4 +198,5 @@ export async function getOfferStatus() {
 
 export function clearOfferSession() {
   clearOfferSessionId();
+  clearOfferMfaChallenge();
 }

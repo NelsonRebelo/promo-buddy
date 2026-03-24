@@ -29,6 +29,10 @@ const OfferLogin = () => {
     try {
       const res = await offerLogin(form);
       if (res.ok) {
+        if (res.requires_mfa) {
+          navigate("/offer-mfa", { replace: true });
+          return;
+        }
         navigate("/offer-promotion-debug", { replace: true });
       } else {
         setError(res.detail || res.error || "Offer promotion login failed.");

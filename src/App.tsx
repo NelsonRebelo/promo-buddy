@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Runner from "./pages/Runner";
 import OfferLogin from "./pages/OfferLogin";
+import OfferMfa from "./pages/OfferMfa";
 import OfferPromotionResult from "./pages/OfferPromotionResult";
 import NotFound from "./pages/NotFound";
 
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/runner" element={<Runner />} />
           <Route path="/offer-login" element={<OfferLogin />} />
+          <Route path="/offer-mfa" element={<OfferMfa />} />
           <Route path="/offer-promotion-debug" element={<OfferPromotionResult />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
