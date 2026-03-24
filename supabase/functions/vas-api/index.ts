@@ -111,6 +111,111 @@ async function followRedirects(
   return response;
 }
 
+function isAuthenticatedAdminHtml(html: string): boolean {
+  const markers = [
+    'id="user-bar"',
+    "menu-section-Tools",
+    "/adminpanel/login/logout/",
+    "/adminpanel/stats/?formToken=",
+    "data-test=\"menu-section-Administration\"",
+  ];
+
+  return markers.some((marker) => html.includes(marker));
+}
+
+async function enrichOfferAdminSession(
+  jar: CookieJar,
+  initialStatsResponse: Response,
+): Promise<{
+  statsHtml: string;
+  paramsText: string;
+  finalCookieHeader: string;
+  validated: boolean;
+  validatedUrl: string;
+}> {
+  const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+  let statsHtml = "";
+  let validatedUrl = initialStatsResponse.url;
+
+  if (initialStatsResponse.url.includes("/adminpanel/stats/")) {
+    statsHtml = await initialStatsResponse.text();
+  } else {
+    const statsRes = await followRedirects(
+      "https://www.standvirtual.com/adminpanel/stats/",
+      jar,
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": userAgent,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+          Referer: initialStatsResponse.url || "https://www.standvirtual.com/adminpanel/login/",
+        },
+      },
+    );
+    validatedUrl = statsRes.url;
+    statsHtml = await statsRes.text();
+  }
+
+  await followRedirects(
+    "https://www.standvirtual.com/adminpanel/",
+    jar,
+    {
+      method: "GET",
+      headers: {
+        "User-Agent": userAgent,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        Referer: "https://www.standvirtual.com/adminpanel/stats/",
+      },
+    },
+  );
+
+  const paramsRes = await fetchWithJar(
+    "https://www.standvirtual.com/ajax/jsdata/params/",
+    jar,
+    {
+      method: "GET",
+      headers: {
+        "User-Agent": userAgent,
+        Accept: "application/javascript, text/javascript, */*; q=0.01",
+        "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        Referer: "https://www.standvirtual.com/adminpanel/stats/",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    },
+  );
+  const paramsText = await paramsRes.text();
+
+  const validationRes = await followRedirects(
+    "https://www.standvirtual.com/adminpanel/stats/",
+    jar,
+    {
+      method: "GET",
+      headers: {
+        "User-Agent": userAgent,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        Referer: "https://www.standvirtual.com/adminpanel/",
+      },
+    },
+  );
+  validatedUrl = validationRes.url;
+  const validationHtml = await validationRes.text();
+  const validated =
+    validationRes.status === 200 &&
+    !validatedUrl.includes("/adminpanel/login") &&
+    isAuthenticatedAdminHtml(validationHtml);
+
+  return {
+    statsHtml,
+    paramsText,
+    finalCookieHeader: buildCookieHeader(jar),
+    validated,
+    validatedUrl,
+  };
+}
+
 async function completeOfferSessionFromSessionToken(
   authorizeUrl: string,
   sessionToken: string,
@@ -126,12 +231,14 @@ async function completeOfferSessionFromSessionToken(
     headers: {
       "User-Agent": userAgent,
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
       Referer: "https://olxgroup.okta-emea.com/",
     },
   });
 
-  const cookieHeader = buildCookieHeader(jar);
-  const finalUrl = finalResponse.url;
+  const enriched = await enrichOfferAdminSession(jar, finalResponse);
+  const cookieHeader = enriched.finalCookieHeader;
+  const finalUrl = enriched.validatedUrl || finalResponse.url;
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
   await supabaseAdmin.rpc("cleanup_expired_offer_sessions");
@@ -155,6 +262,9 @@ async function completeOfferSessionFromSessionToken(
     expires_at: offerSession.expires_at,
     cookie: cookieHeader,
     final_url: finalUrl,
+    validated: enriched.validated,
+    stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
+    params_loaded: enriched.paramsText.length > 0,
   });
 }
 
