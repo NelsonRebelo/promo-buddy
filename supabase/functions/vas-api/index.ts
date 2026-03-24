@@ -268,6 +268,71 @@ async function completeOfferSessionFromSessionToken(
   });
 }
 
+async function completeOfferSessionFromStateToken(
+  stateToken: string,
+  jar: CookieJar,
+  supabaseAdmin: ReturnType<typeof createClient>,
+) {
+  const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+  const oktaRedirectUrl =
+    `https://olxgroup.okta-emea.com/login/token/redirect?stateToken=${encodeURIComponent(stateToken)}`;
+
+  const finalResponse = await followRedirects(oktaRedirectUrl, jar, {
+    method: "GET",
+    headers: {
+      "User-Agent": userAgent,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      Referer: "https://olxgroup.okta-emea.com/",
+    },
+  });
+
+  const enriched = await enrichOfferAdminSession(jar, finalResponse);
+  const cookieHeader = enriched.finalCookieHeader;
+  const finalUrl = enriched.validatedUrl || finalResponse.url;
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+
+  if (!enriched.validated) {
+    return json({
+      ok: false,
+      error: "Offer admin session not authenticated after stateToken redirect",
+      cookie: cookieHeader,
+      final_url: finalUrl,
+      validated: false,
+      stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
+      params_loaded: enriched.paramsText.length > 0,
+      auth_path: "stateTokenRedirect",
+    }, 502);
+  }
+
+  await supabaseAdmin.rpc("cleanup_expired_offer_sessions");
+
+  const { data: offerSession, error: offerInsertError } = await supabaseAdmin
+    .from("offer_sessions")
+    .insert({
+      cookie_header: cookieHeader,
+      expires_at: expiresAt,
+    })
+    .select("offer_session_id, expires_at")
+    .single();
+
+  if (offerInsertError || !offerSession) {
+    return json({ ok: false, error: "Failed to create offer session" }, 500);
+  }
+
+  return json({
+    ok: true,
+    offer_session_id: offerSession.offer_session_id,
+    expires_at: offerSession.expires_at,
+    cookie: cookieHeader,
+    final_url: finalUrl,
+    validated: enriched.validated,
+    stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
+    params_loaded: enriched.paramsText.length > 0,
+    auth_path: "stateTokenRedirect",
+  });
+}
+
 function parseOfferFactors(authnJson: Record<string, unknown>): OfferFactor[] {
   const embedded = authnJson._embedded;
   if (!embedded || typeof embedded !== "object") return [];
@@ -328,7 +393,7 @@ async function pollForOfferSessionToken(
   verifyUrl: string,
   stateToken: string,
   jar: CookieJar,
-): Promise<{ sessionToken: string | null; detail?: string }> {
+): Promise<{ sessionToken: string | null; stateToken?: string | null; detail?: string }> {
   const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
 
   for (let attempt = 0; attempt < 30; attempt += 1) {
@@ -356,8 +421,10 @@ async function pollForOfferSessionToken(
 
     const sessionToken =
       typeof pollJson.sessionToken === "string" ? pollJson.sessionToken : null;
+    const returnedStateToken =
+      typeof pollJson.stateToken === "string" ? pollJson.stateToken : stateToken;
     if (sessionToken) {
-      return { sessionToken };
+      return { sessionToken, stateToken: returnedStateToken };
     }
 
     const status = typeof pollJson.status === "string" ? pollJson.status : "";
@@ -368,7 +435,7 @@ async function pollForOfferSessionToken(
       status === "SUCCESS" ||
       factorResult === "SUCCESS"
     ) {
-      return { sessionToken };
+      return { sessionToken, stateToken: returnedStateToken };
     }
 
     if (
@@ -563,6 +630,18 @@ Deno.serve(async (req) => {
       if (!sessionToken) {
         const polled = await pollForOfferSessionToken(verifyUrl, state_token, jar);
         if (polled.sessionToken) {
+          const stateTokenToUse = polled.stateToken || state_token;
+          const redirected = await completeOfferSessionFromStateToken(
+            stateTokenToUse,
+            jar,
+            supabaseAdmin,
+          );
+
+          const redirectedBody = await redirected.clone().json().catch(() => null);
+          if (redirected.ok && redirectedBody?.validated) {
+            return redirected;
+          }
+
           return await completeOfferSessionFromSessionToken(
             authorize_url,
             polled.sessionToken,
@@ -579,6 +658,16 @@ Deno.serve(async (req) => {
           },
           502,
         );
+      }
+
+      const redirected = await completeOfferSessionFromStateToken(
+        state_token,
+        jar,
+        supabaseAdmin,
+      );
+      const redirectedBody = await redirected.clone().json().catch(() => null);
+      if (redirected.ok && redirectedBody?.validated) {
+        return redirected;
       }
 
       return await completeOfferSessionFromSessionToken(authorize_url, sessionToken, jar, supabaseAdmin);
