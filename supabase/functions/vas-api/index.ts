@@ -59,6 +59,29 @@ function buildCookieHeader(jar: CookieJar): string {
     .join("; ");
 }
 
+const OFFER_STANDVIRTUAL_COOKIE_ALLOWLIST = new Set([
+  "PHPSESSID",
+  "ldf",
+  "lqonap",
+  "laquesis",
+  "laquesisff",
+  "lqstatus",
+  "dfp_user_id",
+  "mobile_default",
+  "OptanonConsent",
+]);
+
+function buildOfferStandvirtualCookieHeader(jar: CookieJar): string {
+  return Array.from(jar.entries())
+    .filter(([name, value]) =>
+      OFFER_STANDVIRTUAL_COOKIE_ALLOWLIST.has(name) &&
+      value !== "" &&
+      value !== '""'
+    )
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ");
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -109,6 +132,30 @@ async function followRedirects(
   }
 
   return response;
+}
+
+async function primeOfferStandvirtualCookies(jar: CookieJar) {
+  const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+
+  await followRedirects("https://www.standvirtual.com/adminpanel/", jar, {
+    method: "GET",
+    headers: {
+      "User-Agent": userAgent,
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    },
+  });
+
+  await fetchWithJar("https://www.standvirtual.com/ajax/jsdata/params/", jar, {
+    method: "GET",
+    headers: {
+      "User-Agent": userAgent,
+      Accept: "application/javascript, text/javascript, */*; q=0.01",
+      "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      Referer: "https://www.standvirtual.com/adminpanel/login/",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+  });
 }
 
 function isAuthenticatedAdminHtml(html: string): boolean {
@@ -237,7 +284,7 @@ async function completeOfferSessionFromSessionToken(
   });
 
   const enriched = await enrichOfferAdminSession(jar, finalResponse);
-  const cookieHeader = enriched.finalCookieHeader;
+  const cookieHeader = buildOfferStandvirtualCookieHeader(jar);
   const finalUrl = enriched.validatedUrl || finalResponse.url;
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
@@ -288,7 +335,7 @@ async function completeOfferSessionFromStateToken(
   });
 
   const enriched = await enrichOfferAdminSession(jar, finalResponse);
-  const cookieHeader = enriched.finalCookieHeader;
+  const cookieHeader = buildOfferStandvirtualCookieHeader(jar);
   const finalUrl = enriched.validatedUrl || finalResponse.url;
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
@@ -479,6 +526,8 @@ Deno.serve(async (req) => {
 
       const jar: CookieJar = new Map();
       const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+
+      await primeOfferStandvirtualCookies(jar);
 
       const oktaEntry = await fetchWithJar(
         "https://www.standvirtual.com/adminpanel/login/loginwithokta/",
