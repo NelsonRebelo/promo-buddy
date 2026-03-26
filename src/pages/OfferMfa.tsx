@@ -44,7 +44,7 @@ const OfferMfa = () => {
         factor_id: selectedFactor.id,
       });
       if (res.ok) {
-        navigate("/offer-promotion-debug", { replace: true });
+        navigate("/offer-runner", { replace: true });
       } else {
         setError(res.detail || res.error || "MFA verification failed.");
       }

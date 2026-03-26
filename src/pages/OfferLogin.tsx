@@ -33,7 +33,7 @@ const OfferLogin = () => {
           navigate("/offer-mfa", { replace: true });
           return;
         }
-        navigate("/offer-promotion-debug", { replace: true });
+        navigate("/offer-runner", { replace: true });
       } else {
         setError(res.detail || res.error || "Offer promotion login failed.");
       }
