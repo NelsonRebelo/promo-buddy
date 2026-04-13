@@ -803,13 +803,20 @@ Deno.serve(async (req) => {
             Cookie: offerSession.cookie_header,
           },
           body: new URLSearchParams({ id_index: String(promotion) }),
-          redirect: "manual",
+          redirect: "follow",
         });
 
         const status = upstreamRes.status;
+        const finalUrl = upstreamRes.url;
         const responseText = await upstreamRes.text().catch(() => "");
+        const wasRedirectedToLogin =
+          finalUrl.includes("/adminpanel/login") ||
+          finalUrl.includes("/login") ||
+          responseText.toLowerCase().includes("login");
         const message = responseText.includes("Ad was paid successfully")
           ? "Ad was paid successfully"
+          : wasRedirectedToLogin
+            ? "Standvirtual redirected to login. The captured cookie is not valid for this request."
           : responseText.substring(0, 500) || `HTTP ${status}`;
         const success =
           (status === 200 || status === 201 || status === 202) &&
@@ -820,6 +827,7 @@ Deno.serve(async (req) => {
           advert,
           promotion,
           status,
+          finalUrl,
           message,
           errorMessage: success ? undefined : message,
         }, success ? 200 : status >= 400 ? status : 502);
