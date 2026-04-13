@@ -283,10 +283,14 @@ async function enrichOfferAdminSession(
   finalCookieHeader: string;
   validated: boolean;
   validatedUrl: string;
+  usercardsStatus: number;
+  usercardsUrl: string;
 }> {
   const userAgent = OFFER_BROWSER_USER_AGENT;
   let statsHtml = "";
   let validatedUrl = initialStatsResponse.url;
+  let usercardsStatus = 0;
+  let usercardsUrl = "";
 
   if (initialStatsResponse.url.includes("/adminpanel/stats/")) {
     statsHtml = await initialStatsResponse.text();
@@ -338,6 +342,23 @@ async function enrichOfferAdminSession(
   );
   const paramsText = await paramsRes.text();
 
+  const usercardsRes = await followRedirects(
+    "https://www.standvirtual.com/adminpanel/usercards/?search%5Buser_id%5D=6",
+    jar,
+    {
+      method: "GET",
+      headers: {
+        "User-Agent": userAgent,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        Referer: "https://www.standvirtual.com/adminpanel/stats/",
+      },
+    },
+  );
+  usercardsStatus = usercardsRes.status;
+  usercardsUrl = usercardsRes.url;
+  await usercardsRes.text().catch(() => "");
+
   const validationRes = await followRedirects(
     "https://www.standvirtual.com/adminpanel/stats/",
     jar,
@@ -364,6 +385,8 @@ async function enrichOfferAdminSession(
     finalCookieHeader: buildCookieHeader(jar),
     validated,
     validatedUrl,
+    usercardsStatus,
+    usercardsUrl,
   };
 }
 
@@ -414,6 +437,8 @@ async function completeOfferSessionFromSessionToken(
     cookie: cookieHeader,
     final_url: finalUrl,
     validated: enriched.validated,
+    usercards_status: enriched.usercardsStatus,
+    usercards_url: enriched.usercardsUrl,
     stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
     params_loaded: enriched.paramsText.length > 0,
   });
@@ -450,6 +475,8 @@ async function completeOfferSessionFromStateToken(
       cookie: cookieHeader,
       final_url: finalUrl,
       validated: false,
+      usercards_status: enriched.usercardsStatus,
+      usercards_url: enriched.usercardsUrl,
       stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
       params_loaded: enriched.paramsText.length > 0,
       auth_path: "stateTokenRedirect",
@@ -478,6 +505,8 @@ async function completeOfferSessionFromStateToken(
     cookie: cookieHeader,
     final_url: finalUrl,
     validated: enriched.validated,
+    usercards_status: enriched.usercardsStatus,
+    usercards_url: enriched.usercardsUrl,
     stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
     params_loaded: enriched.paramsText.length > 0,
     auth_path: "stateTokenRedirect",
