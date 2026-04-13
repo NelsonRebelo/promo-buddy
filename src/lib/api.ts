@@ -2,6 +2,19 @@ const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vas-api`
 const SESSION_KEY = "vas_session_id";
 const OFFER_SESSION_KEY = "offer_session_id";
 const OFFER_MFA_KEY = "offer_mfa_challenge";
+const AUTH_EMAIL_KEY = "promo_buddy_auth_email";
+
+function setAuthEmail(email: string) {
+  localStorage.setItem(AUTH_EMAIL_KEY, email.trim().toLowerCase());
+}
+
+function clearAuthEmail() {
+  localStorage.removeItem(AUTH_EMAIL_KEY);
+}
+
+export function getStoredAuthEmail(): string | null {
+  return localStorage.getItem(AUTH_EMAIL_KEY);
+}
 
 function getSessionId(): string | null {
   return localStorage.getItem(SESSION_KEY);
@@ -118,6 +131,7 @@ export async function login(data: { username: string; password: string }) {
   }
   if (json.ok && json.session_id) {
     setSessionId(json.session_id);
+    setAuthEmail(data.username);
   }
   return json;
 }
@@ -125,6 +139,7 @@ export async function login(data: { username: string; password: string }) {
 export async function logout() {
   const res = await request("/logout", { method: "POST" });
   clearSessionId();
+  clearAuthEmail();
   return res.json();
 }
 
@@ -157,8 +172,10 @@ export async function offerLogin(data: { username: string; password: string }) {
   }
   if (json.ok && json.offer_session_id) {
     setOfferSessionId(json.offer_session_id);
+    setAuthEmail(data.username);
   }
   if (json.ok && json.requires_mfa && json.state_token && json.authorize_url) {
+    setAuthEmail(data.username);
     setOfferMfaChallenge({
       state_token: json.state_token,
       authorize_url: json.authorize_url,
@@ -210,4 +227,5 @@ export async function sendOfferPromotion(advert: string, promotion: string) {
 export function clearOfferSession() {
   clearOfferSessionId();
   clearOfferMfaChallenge();
+  clearAuthEmail();
 }

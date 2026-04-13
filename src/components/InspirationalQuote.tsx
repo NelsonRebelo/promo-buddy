@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { getStoredAuthEmail } from "@/lib/api";
 
 const QUOTES = [
   "You are enough exactly as you are. Did you smile today?",
@@ -104,20 +105,45 @@ const QUOTES = [
 ];
 
 const STORAGE_KEY = "promo-buddy-seen-quotes";
+const FLIRTY_STORAGE_KEY = "promo-buddy-seen-flirty-quotes";
+const FLIRTY_QUOTE_CHANCE = 0.3;
+const FLIRTY_ALLOWED_EMAILS = new Set(["rita.galvao@olx.com", "nelson.rebelo@olx.com"]);
+
+const FLIRTY_QUOTES = [
+  "You look like a bad decision in perfect packaging. 😏🌶️",
+  "You are the reason self-control starts shaking. 🥵👀",
+  "You have that energy that turns heads and ruins focus. 😳🌶️",
+  "You are soft-looking and absolutely not safe. 😏🫦",
+  "You walk in and suddenly the room forgets how to behave. 👀🥵",
+  "You are the type people stare at, then regret staring at. 😳😏",
+  "You have danger written all over you, just beautifully. 🌶️👀",
+  "You are giving temptation with no warning label. 🫦🥵",
+  "You look sweet, but that is clearly not the full story. 😏😳",
+  "You are the kind of trouble people would choose twice. 🌶️🍑",
+];
+
+function pickNonRepeatingQuote(quotes: string[], storageKey: string) {
+  const stored = window.localStorage.getItem(storageKey);
+  const seen = stored ? (JSON.parse(stored) as number[]) : [];
+  const validSeen = seen.filter((index) => Number.isInteger(index) && index >= 0 && index < quotes.length);
+  const remaining = quotes.map((_, index) => index).filter((index) => !validSeen.includes(index));
+  const pool = remaining.length > 0 ? remaining : quotes.map((_, index) => index);
+  const nextIndex = pool[Math.floor(Math.random() * pool.length)];
+  const nextSeen = remaining.length > 0 ? [...validSeen, nextIndex] : [nextIndex];
+  window.localStorage.setItem(storageKey, JSON.stringify(nextSeen));
+  return quotes[nextIndex];
+}
 
 function getQuote() {
   if (typeof window === "undefined") return QUOTES[0];
 
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const seen = stored ? (JSON.parse(stored) as number[]) : [];
-    const validSeen = seen.filter((index) => Number.isInteger(index) && index >= 0 && index < QUOTES.length);
-    const remaining = QUOTES.map((_, index) => index).filter((index) => !validSeen.includes(index));
-    const pool = remaining.length > 0 ? remaining : QUOTES.map((_, index) => index);
-    const nextIndex = pool[Math.floor(Math.random() * pool.length)];
-    const nextSeen = remaining.length > 0 ? [...validSeen, nextIndex] : [nextIndex];
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSeen));
-    return QUOTES[nextIndex];
+    const email = getStoredAuthEmail()?.trim().toLowerCase();
+    const canShowFlirty = Boolean(email && FLIRTY_ALLOWED_EMAILS.has(email));
+    if (canShowFlirty && Math.random() < FLIRTY_QUOTE_CHANCE) {
+      return pickNonRepeatingQuote(FLIRTY_QUOTES, FLIRTY_STORAGE_KEY);
+    }
+    return pickNonRepeatingQuote(QUOTES, STORAGE_KEY);
   } catch {
     return QUOTES[Math.floor(Math.random() * QUOTES.length)];
   }
