@@ -1054,14 +1054,22 @@ Deno.serve(async (req) => {
         const status = upstreamRes.status;
         const finalUrl = upstreamRes.url;
         const responseText = await upstreamRes.text().catch(() => "");
-        const wasRedirectedToLogin =
+        const statsRedirectedToLogin =
+          statsRes.url.includes("/adminpanel/login") ||
+          statsRes.url.includes("/login");
+        const paymentRedirectedToLogin =
           finalUrl.includes("/adminpanel/login") ||
-          finalUrl.includes("/login") ||
+          finalUrl.includes("/login");
+        const responseLooksLikeLogin =
           responseText.toLowerCase().includes("login");
         const message = responseText.includes("Ad was paid successfully")
           ? "Ad was paid successfully"
-          : wasRedirectedToLogin
+          : statsRedirectedToLogin
             ? "Standvirtual redirected to login. The captured cookie is not valid for this request."
+          : paymentRedirectedToLogin
+            ? "Standvirtual redirected the payment request. The session is valid, but this promotion may not be available for this advert or current state."
+          : responseLooksLikeLogin
+            ? "Standvirtual returned a login-like response for the payment request. Check this advert and promotion eligibility."
           : responseText.substring(0, 500) || `HTTP ${status}`;
         const success =
           (status === 200 || status === 201 || status === 202) &&
@@ -1074,6 +1082,8 @@ Deno.serve(async (req) => {
           status,
           finalUrl,
           statsUrl: statsRes.url,
+          statsRedirectedToLogin,
+          paymentRedirectedToLogin,
           formTokenFound: Boolean(formToken),
           userIdFound: Boolean(userId),
           cookie_length: offerSession.cookie_header.length,
