@@ -78,6 +78,10 @@ function cookieHeaderToJar(cookieHeader: string): CookieJar {
   return jar;
 }
 
+function cloneCookieJar(jar: CookieJar): CookieJar {
+  return new Map(jar);
+}
+
 function getCookieNames(cookieHeader: string): string[] {
   return cookieHeader
     .split(";")
@@ -878,10 +882,21 @@ Deno.serve(async (req) => {
       if (!sessionToken) {
         const polled = await pollForOfferSessionToken(verifyUrl, state_token, jar);
         if (polled.sessionToken) {
+          const sessionRedirected = await completeOfferSessionFromSessionToken(
+            authorize_url,
+            polled.sessionToken,
+            cloneCookieJar(jar),
+            supabaseAdmin,
+          );
+          const sessionRedirectedBody = await sessionRedirected.clone().json().catch(() => null);
+          if (sessionRedirected.ok && sessionRedirectedBody?.validated) {
+            return sessionRedirected;
+          }
+
           const stateTokenToUse = polled.stateToken || state_token;
           const redirected = await completeOfferSessionFromStateToken(
             stateTokenToUse,
-            jar,
+            cloneCookieJar(jar),
             supabaseAdmin,
           );
 
@@ -890,12 +905,7 @@ Deno.serve(async (req) => {
             return redirected;
           }
 
-          return await completeOfferSessionFromSessionToken(
-            authorize_url,
-            polled.sessionToken,
-            jar,
-            supabaseAdmin,
-          );
+          return sessionRedirected;
         }
 
         return json(
@@ -908,9 +918,20 @@ Deno.serve(async (req) => {
         );
       }
 
+      const sessionRedirected = await completeOfferSessionFromSessionToken(
+        authorize_url,
+        sessionToken,
+        cloneCookieJar(jar),
+        supabaseAdmin,
+      );
+      const sessionRedirectedBody = await sessionRedirected.clone().json().catch(() => null);
+      if (sessionRedirected.ok && sessionRedirectedBody?.validated) {
+        return sessionRedirected;
+      }
+
       const redirected = await completeOfferSessionFromStateToken(
         state_token,
-        jar,
+        cloneCookieJar(jar),
         supabaseAdmin,
       );
       const redirectedBody = await redirected.clone().json().catch(() => null);
@@ -918,7 +939,7 @@ Deno.serve(async (req) => {
         return redirected;
       }
 
-      return await completeOfferSessionFromSessionToken(authorize_url, sessionToken, jar, supabaseAdmin);
+      return sessionRedirected;
     }
 
     if (path === "/offer/status" && req.method === "GET") {
