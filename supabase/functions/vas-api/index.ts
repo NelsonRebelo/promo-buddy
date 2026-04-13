@@ -750,6 +750,90 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (path === "/offer/send" && req.method === "POST") {
+      const offerSessionId = getOfferSessionId(req);
+      if (!offerSessionId) {
+        return json({ success: false, errorMessage: "Not authenticated" }, 401);
+      }
+
+      const { data: offerSession } = await supabaseAdmin
+        .from("offer_sessions")
+        .select("cookie_header, expires_at")
+        .eq("offer_session_id", offerSessionId)
+        .single();
+
+      if (!offerSession) {
+        return json({ success: false, errorMessage: "Session not found" }, 401);
+      }
+
+      if (new Date(offerSession.expires_at) < new Date()) {
+        await supabaseAdmin.from("offer_sessions").delete().eq("offer_session_id", offerSessionId);
+        return json({ success: false, errorMessage: "Session expired" }, 401);
+      }
+
+      const { advert, promotion } = await req.json();
+      if (!advert || !promotion) {
+        return json({ success: false, advert, promotion, status: 400, errorMessage: "Missing advert or promotion" }, 400);
+      }
+
+      try {
+        const pagamentoUrl = `https://www.standvirtual.com/adminpanel/pagamento/${encodeURIComponent(advert)}/`;
+        const upstreamRes = await fetch(pagamentoUrl, {
+          method: "POST",
+          headers: {
+            accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "accept-language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "cache-control": "no-cache",
+            "content-type": "application/x-www-form-urlencoded",
+            origin: "https://www.standvirtual.com",
+            pragma: "no-cache",
+            priority: "u=0, i",
+            referer: pagamentoUrl,
+            "sec-ch-ua": "\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"macOS\"",
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-user": "?1",
+            "upgrade-insecure-requests": "1",
+            "user-agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+            Cookie: offerSession.cookie_header,
+          },
+          body: new URLSearchParams({ id_index: String(promotion) }),
+          redirect: "manual",
+        });
+
+        const status = upstreamRes.status;
+        const responseText = await upstreamRes.text().catch(() => "");
+        const message = responseText.includes("Ad was paid successfully")
+          ? "Ad was paid successfully"
+          : responseText.substring(0, 500) || `HTTP ${status}`;
+        const success =
+          (status === 200 || status === 201 || status === 202) &&
+          responseText.includes("Ad was paid successfully");
+
+        return json({
+          success,
+          advert,
+          promotion,
+          status,
+          message,
+          errorMessage: success ? undefined : message,
+        }, success ? 200 : status >= 400 ? status : 502);
+      } catch (err) {
+        return json({
+          success: false,
+          advert,
+          promotion,
+          status: "network error",
+          errorMessage: err instanceof Error ? err.message : "Network error",
+        });
+      }
+    }
+
     // ─── POST /login ───
     if (path === "/login" && req.method === "POST") {
       const { username, password } = await req.json();

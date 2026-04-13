@@ -196,6 +196,14 @@ export async function getOfferStatus() {
   return res.json();
 }
 
+export async function sendOfferPromotion(advert: string, promotion: string) {
+  const res = await offerRequest("/offer/send", {
+    method: "POST",
+    body: JSON.stringify({ advert, promotion }),
+  });
+  return { status: res.status, data: await res.json() };
+}
+
 export function clearOfferSession() {
   clearOfferSessionId();
   clearOfferMfaChallenge();

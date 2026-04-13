@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/table";
 import {
   ArrowLeft,
-  CheckCircle2,
   Copy,
   Loader2,
   LogOut,
@@ -25,7 +24,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { clearOfferSession, getOfferStatus } from "@/lib/api";
+import { clearOfferSession, getOfferStatus, sendOfferPromotion } from "@/lib/api";
 
 type CsvRow = { advert: string; promotion: string };
 type PromotionOption = { name: string; id: string };
@@ -121,7 +120,9 @@ const OfferRunner = () => {
   const failCount = results.filter((r) => !r.success).length;
   const progress = rows.length > 0 ? (completed / rows.length) * 100 : 0;
   const totalRowsPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const totalResultPages = Math.max(1, Math.ceil(results.length / ROWS_PER_PAGE));
   const paginatedRows = rows.slice((rowsPage - 1) * ROWS_PER_PAGE, rowsPage * ROWS_PER_PAGE);
+  const paginatedResults = results.slice((rowsPage - 1) * ROWS_PER_PAGE, rowsPage * ROWS_PER_PAGE);
 
   useEffect(() => {
     getOfferStatus()
@@ -200,10 +201,10 @@ const OfferRunner = () => {
   const getPromotionLabel = (promotionId: string) =>
     PROMOTION_OPTIONS.find((option) => option.id === promotionId)?.name;
 
-  const copyPreparedRows = async () => {
-    if (rows.length === 0) return;
-    const clipboardText = rows
-      .map((row) => `${row.advert}\t${getPromotionLabel(row.promotion) || row.promotion}`)
+  const copyResultRows = async () => {
+    if (results.length === 0) return;
+    const clipboardText = results
+      .map((row) => `${row.advert}\t${getPromotionLabel(row.promotion) || row.promotion}\t${row.success ? "Success" : "Failed"}\t${row.errorMessage || row.status}`)
       .join("\n");
 
     try {
@@ -229,13 +230,24 @@ const OfferRunner = () => {
       while (idx < rows.length && !cancelRef.current) {
         const i = idx++;
         const row = rows[i];
-        await new Promise((resolve) => window.setTimeout(resolve, 80));
-        allResults.push({
-          advert: row.advert,
-          promotion: row.promotion,
-          success: true,
-          status: "prepared",
-        });
+        try {
+          const { status, data } = await sendOfferPromotion(row.advert, row.promotion);
+          allResults.push({
+            advert: row.advert,
+            promotion: row.promotion,
+            success: Boolean(data.success),
+            status: data.status ?? status,
+            errorMessage: data.message || data.errorMessage || data.error || "",
+          });
+        } catch (err) {
+          allResults.push({
+            advert: row.advert,
+            promotion: row.promotion,
+            success: false,
+            status: "network error",
+            errorMessage: err instanceof Error ? err.message : "Network error",
+          });
+        }
         setCompleted((c) => c + 1);
         setResults([...allResults]);
       }
@@ -599,17 +611,17 @@ const OfferRunner = () => {
             <Card ref={preparedRef} className="glass rounded-3xl border-white/75 xl:col-span-2">
               <CardHeader className="pb-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-lg font-semibold tracking-tight">Prepared offer promotion rows</CardTitle>
+                  <CardTitle className="text-lg font-semibold tracking-tight">Offer promotion results</CardTitle>
                   {rows.length > 0 && (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={copyPreparedRows}
+                      onClick={copyResultRows}
                       className="rounded-full border-white/80 bg-white/70"
                     >
                       <Copy className="mr-2 h-4 w-4" />
-                      {copyingRows ? "Copied" : "Copy prepared rows"}
+                      {copyingRows ? "Copied" : "Copy result rows"}
                     </Button>
                   )}
                 </div>
@@ -617,21 +629,18 @@ const OfferRunner = () => {
               <CardContent className="space-y-4">
                 {showPreparedNotice && (
                   <Alert className="rounded-2xl border-sky-200 bg-sky-50/80 text-sky-700">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <AlertDescription>
-                      Rows were prepared locally only. Offer promotion API requests are not connected yet.
-                    </AlertDescription>
+                    <AlertDescription>Rows were processed through the Offer promotion request flow.</AlertDescription>
                   </Alert>
                 )}
 
-                {rows.length > 0 && (
+                {results.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-muted-foreground">
-                        {rows.length} row{rows.length !== 1 ? "s" : ""} prepared
+                        {results.length} row{results.length !== 1 ? "s" : ""} processed
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Page {rowsPage} of {totalRowsPages}
+                        Page {rowsPage} of {totalResultPages}
                       </p>
                     </div>
                     <div className="overflow-hidden rounded-2xl border border-white/75 bg-white/72 p-0">
@@ -642,21 +651,27 @@ const OfferRunner = () => {
                             <TableHead>Advert</TableHead>
                             <TableHead>Promotion</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead>Message</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {paginatedRows.map((row, i) => (
-                            <TableRow key={`${row.advert}-${row.promotion}-${i}`} className="transition-colors hover:bg-white/70">
-                              <TableCell>{row.advert}</TableCell>
-                              <TableCell>{getPromotionLabel(row.promotion) || row.promotion}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">Prepared locally</TableCell>
+                          {paginatedResults.map((result, i) => (
+                            <TableRow key={`${result.advert}-${result.promotion}-${i}`} className="transition-colors hover:bg-white/70">
+                              <TableCell>{result.advert}</TableCell>
+                              <TableCell>{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
+                              <TableCell className={result.success ? "text-sm font-medium text-emerald-700" : "text-sm font-medium text-rose-700"}>
+                                {result.success ? "Success" : "Failed"}
+                              </TableCell>
+                              <TableCell className="max-w-sm truncate text-sm text-muted-foreground">
+                                {result.errorMessage || result.status}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
                   </div>
-                    {totalRowsPages > 1 && (
+                    {totalResultPages > 1 && (
                       <div className="flex items-center justify-between gap-3">
                         <Button
                           type="button"
@@ -669,15 +684,15 @@ const OfferRunner = () => {
                           Previous
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                          Showing {paginatedRows.length} of {rows.length}
+                          Showing {paginatedResults.length} of {results.length}
                         </p>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="rounded-full"
-                          disabled={rowsPage === totalRowsPages}
-                          onClick={() => setRowsPage((page) => Math.min(totalRowsPages, page + 1))}
+                          disabled={rowsPage === totalResultPages}
+                          onClick={() => setRowsPage((page) => Math.min(totalResultPages, page + 1))}
                         >
                           Next
                         </Button>
