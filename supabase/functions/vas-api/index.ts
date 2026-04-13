@@ -62,6 +62,20 @@ function buildCookieHeader(jar: CookieJar): string {
     .join("; ");
 }
 
+function cookieHeaderToJar(cookieHeader: string): CookieJar {
+  const jar: CookieJar = new Map();
+  for (const cookie of cookieHeader.split(";")) {
+    const trimmed = cookie.trim();
+    const eqIndex = trimmed.indexOf("=");
+    if (eqIndex === -1) continue;
+    const name = trimmed.slice(0, eqIndex).trim();
+    const value = trimmed.slice(eqIndex + 1).trim();
+    if (!name) continue;
+    jar.set(name, value);
+  }
+  return jar;
+}
+
 function getCookieNames(cookieHeader: string): string[] {
   return cookieHeader
     .split(";")
@@ -734,9 +748,24 @@ Deno.serve(async (req) => {
       if (typeof authnJson.status === "string" && authnJson.status === "MFA_REQUIRED") {
         const factors = parseOfferFactors(authnJson);
         const preferredFactor = choosePreferredOfferFactor(factors);
+        const pendingExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        const { data: pendingOfferSession, error: pendingOfferSessionError } = await supabaseAdmin
+          .from("offer_sessions")
+          .insert({
+            cookie_header: buildCookieHeader(jar),
+            expires_at: pendingExpiresAt,
+          })
+          .select("offer_session_id")
+          .single();
+
+        if (pendingOfferSessionError || !pendingOfferSession) {
+          return json({ ok: false, error: "Failed to create pending Offer login session" }, 500);
+        }
+
         return json({
           ok: true,
           requires_mfa: true,
+          offer_session_id: pendingOfferSession.offer_session_id,
           state_token: typeof authnJson.stateToken === "string" ? authnJson.stateToken : null,
           authorize_url: authorizeUrl,
           factors,
@@ -764,7 +793,20 @@ Deno.serve(async (req) => {
         return json({ ok: false, error: "Missing MFA verification fields" }, 400);
       }
 
-      const jar: CookieJar = new Map();
+      const pendingOfferSessionId = getOfferSessionId(req);
+      let jar: CookieJar = new Map();
+      if (pendingOfferSessionId) {
+        const { data: pendingOfferSession } = await supabaseAdmin
+          .from("offer_sessions")
+          .select("cookie_header, expires_at")
+          .eq("offer_session_id", pendingOfferSessionId)
+          .single();
+
+        if (pendingOfferSession && new Date(pendingOfferSession.expires_at) >= new Date()) {
+          jar = cookieHeaderToJar(pendingOfferSession.cookie_header);
+        }
+      }
+
       const userAgent = OFFER_BROWSER_USER_AGENT;
 
       const verifyUrl = `https://olxgroup.okta-emea.com/api/v1/authn/factors/${encodeURIComponent(factor_id)}/verify`;
