@@ -110,6 +110,7 @@ export async function login(data: { username: string; password: string }) {
   const json = await res.json();
   if (!res.ok) {
     return {
+      ...json,
       ok: false,
       error: json.error || json.message || `HTTP ${res.status}`,
       detail: json.detail,
@@ -148,6 +149,7 @@ export async function offerLogin(data: { username: string; password: string }) {
   const json = await res.json();
   if (!res.ok) {
     return {
+      ...json,
       ok: false,
       error: json.error || json.message || `HTTP ${res.status}`,
       detail: json.detail,
@@ -179,6 +181,7 @@ export async function offerVerifyMfa(data: {
   const json = await res.json();
   if (!res.ok) {
     return {
+      ...json,
       ok: false,
       error: json.error || json.message || `HTTP ${res.status}`,
       detail: json.detail,

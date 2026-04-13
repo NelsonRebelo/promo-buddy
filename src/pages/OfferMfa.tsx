@@ -6,11 +6,32 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { clearOfferMfaChallenge, getOfferMfaChallenge, offerVerifyMfa } from "@/lib/api";
 
+const formatOfferDiagnostics = (response: Record<string, unknown>) => {
+  const keys = [
+    "auth_path",
+    "validated",
+    "final_url",
+    "usercards_status",
+    "usercards_url",
+    "stats_contains_admin_markers",
+    "params_loaded",
+    "cookie_length",
+    "cookie_names",
+  ];
+  const diagnostics = Object.fromEntries(
+    keys
+      .filter((key) => response[key] !== undefined)
+      .map((key) => [key, response[key]]),
+  );
+  return Object.keys(diagnostics).length > 0 ? JSON.stringify(diagnostics, null, 2) : "";
+};
+
 const OfferMfa = () => {
   const navigate = useNavigate();
   const challenge = useMemo(() => getOfferMfaChallenge(), []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [diagnostics, setDiagnostics] = useState("");
   const [status, setStatus] = useState("Waiting for approval...");
 
   const selectedFactor =
@@ -33,6 +54,7 @@ const OfferMfa = () => {
     }
 
     setError("");
+    setDiagnostics("");
     setLoading(true);
     setStatus(
       `Approve the ${selectedFactor.factorType === "signed_nonce" ? "FastPass" : "push notification"} request on your device.`,
@@ -47,6 +69,7 @@ const OfferMfa = () => {
         navigate("/offer-runner", { replace: true });
       } else {
         setError(res.detail || res.error || "MFA verification failed.");
+        setDiagnostics(formatOfferDiagnostics(res as Record<string, unknown>));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error");
@@ -112,6 +135,14 @@ const OfferMfa = () => {
                   <Alert variant="destructive" className="rounded-2xl">
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
+                )}
+                {diagnostics && (
+                  <div className="rounded-2xl border border-white/80 bg-white/75 p-4 text-left">
+                    <p className="mb-2 text-sm font-medium text-foreground">Debug details</p>
+                    <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
+                      {diagnostics}
+                    </pre>
+                  </div>
                 )}
                 <div className="rounded-2xl border border-white/80 bg-white/70 px-4 py-4 text-sm text-muted-foreground">
                   {loading ? status : error ? "Approval did not complete." : "Ready to verify."}

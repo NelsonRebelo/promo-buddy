@@ -432,6 +432,22 @@ async function completeOfferSessionFromSessionToken(
   const finalUrl = enriched.validatedUrl || finalResponse.url;
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
+  if (!enriched.validated) {
+    return json({
+      ok: false,
+      error: "Offer admin session not authenticated after sessionToken redirect",
+      cookie_length: cookieHeader.length,
+      cookie_names: getCookieNames(cookieHeader),
+      final_url: finalUrl,
+      validated: false,
+      usercards_status: enriched.usercardsStatus,
+      usercards_url: enriched.usercardsUrl,
+      stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
+      params_loaded: enriched.paramsText.length > 0,
+      auth_path: "sessionTokenRedirect",
+    }, 502);
+  }
+
   await supabaseAdmin.rpc("cleanup_expired_offer_sessions");
 
   const { data: offerSession, error: offerInsertError } = await supabaseAdmin
@@ -452,6 +468,8 @@ async function completeOfferSessionFromSessionToken(
     offer_session_id: offerSession.offer_session_id,
     expires_at: offerSession.expires_at,
     cookie: cookieHeader,
+    cookie_length: cookieHeader.length,
+    cookie_names: getCookieNames(cookieHeader),
     final_url: finalUrl,
     validated: enriched.validated,
     usercards_status: enriched.usercardsStatus,
@@ -489,7 +507,8 @@ async function completeOfferSessionFromStateToken(
     return json({
       ok: false,
       error: "Offer admin session not authenticated after stateToken redirect",
-      cookie: cookieHeader,
+      cookie_length: cookieHeader.length,
+      cookie_names: getCookieNames(cookieHeader),
       final_url: finalUrl,
       validated: false,
       usercards_status: enriched.usercardsStatus,
@@ -520,6 +539,8 @@ async function completeOfferSessionFromStateToken(
     offer_session_id: offerSession.offer_session_id,
     expires_at: offerSession.expires_at,
     cookie: cookieHeader,
+    cookie_length: cookieHeader.length,
+    cookie_names: getCookieNames(cookieHeader),
     final_url: finalUrl,
     validated: enriched.validated,
     usercards_status: enriched.usercardsStatus,
