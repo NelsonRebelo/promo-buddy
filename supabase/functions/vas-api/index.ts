@@ -60,15 +60,30 @@ function buildCookieHeader(jar: CookieJar): string {
 }
 
 const OFFER_STANDVIRTUAL_COOKIE_ALLOWLIST = new Set([
+  "__gfp_64b",
+  "__Host-next-auth.csrf-token",
+  "__Secure-next-auth.callback-url",
+  "__Secure-next-auth.session-token",
+  "ab.storage.deviceId.e445935b-777a-429f-9f37-ac9297914d6e",
+  "ab.storage.sessionId.e445935b-777a-429f-9f37-ac9297914d6e",
+  "ab.storage.userId.e445935b-777a-429f-9f37-ac9297914d6e",
+  "datadome",
   "PHPSESSID",
   "ldf",
   "lqonap",
+  "onap",
   "laquesis",
   "laquesisff",
   "lqstatus",
   "dfp_user_id",
+  "id_token",
   "mobile_default",
+  "OptanonAlertBoxClosed",
   "OptanonConsent",
+  "OTAdditionalConsentString",
+  "refresh_token",
+  "test",
+  "eupubconsent-v2",
 ]);
 
 function buildOfferStandvirtualCookieHeader(jar: CookieJar): string {
