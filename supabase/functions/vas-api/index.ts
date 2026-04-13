@@ -69,6 +69,45 @@ function getCookieNames(cookieHeader: string): string[] {
     .filter(Boolean);
 }
 
+function getCookieValue(cookieHeader: string, name: string): string | null {
+  const prefix = `${name}=`;
+  const cookie = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix));
+  return cookie ? cookie.slice(prefix.length) : null;
+}
+
+function extractOfferFormToken(html: string): string | null {
+  const patterns = [
+    /formToken(?:%5D)?(?:=|%5D=)([a-f0-9]{16,})/i,
+    /formToken["']?\s*[:=]\s*["']([a-f0-9]{16,})["']/i,
+    /formToken%5D=([a-f0-9]{16,})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+
+  return null;
+}
+
+function buildOfferPaymentReferer(advert: string, userId: string | null, formToken: string | null): string {
+  const referer = new URL(`https://www.standvirtual.com/adminpanel/pagamento/${encodeURIComponent(advert)}/`);
+  referer.searchParams.set("ref[0][params][type]", "active");
+  if (userId) referer.searchParams.set("ref[0][params][userID]", userId);
+  referer.searchParams.set("ref[0][params][page]", "1");
+  referer.searchParams.set("ref[0][params][sortByField]", "created_at");
+  referer.searchParams.set("ref[0][params][sortByDirection]", "desc");
+  referer.searchParams.set("ref[0][params][numResults]", "50");
+  if (formToken) referer.searchParams.set("ref[0][params][formToken]", formToken);
+  referer.searchParams.set("ref[0][ajax]", "1");
+  referer.searchParams.set("ref[0][action]", "moderation");
+  referer.searchParams.set("ref[0][method]", "userads");
+  return referer.toString();
+}
+
 const OFFER_STANDVIRTUAL_COOKIE_ALLOWLIST = new Set([
   "_cc_id",
   "_fbp",
@@ -845,6 +884,30 @@ Deno.serve(async (req) => {
 
       try {
         const pagamentoUrl = `https://www.standvirtual.com/adminpanel/pagamento/${encodeURIComponent(advert)}/`;
+        const statsRes = await fetch("https://www.standvirtual.com/adminpanel/stats/", {
+          method: "GET",
+          headers: {
+            accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "accept-language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "cache-control": "no-cache",
+            pragma: "no-cache",
+            "sec-ch-ua": "\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"macOS\"",
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "same-origin",
+            "upgrade-insecure-requests": "1",
+            "user-agent": OFFER_BROWSER_USER_AGENT,
+            Cookie: offerSession.cookie_header,
+          },
+          redirect: "follow",
+        });
+        const statsHtml = await statsRes.text().catch(() => "");
+        const formToken = extractOfferFormToken(statsHtml);
+        const userId = getCookieValue(offerSession.cookie_header, "user_id");
+        const paymentReferer = buildOfferPaymentReferer(advert, userId, formToken);
         const upstreamRes = await fetch(pagamentoUrl, {
           method: "POST",
           headers: {
@@ -856,7 +919,7 @@ Deno.serve(async (req) => {
             origin: "https://www.standvirtual.com",
             pragma: "no-cache",
             priority: "u=0, i",
-            referer: pagamentoUrl,
+            referer: paymentReferer,
             "sec-ch-ua": "\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"",
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": "\"macOS\"",
@@ -865,8 +928,7 @@ Deno.serve(async (req) => {
             "sec-fetch-site": "same-origin",
             "sec-fetch-user": "?1",
             "upgrade-insecure-requests": "1",
-            "user-agent":
-              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+            "user-agent": OFFER_BROWSER_USER_AGENT,
             Cookie: offerSession.cookie_header,
           },
           body: new URLSearchParams({ id_index: String(promotion) }),
@@ -895,6 +957,9 @@ Deno.serve(async (req) => {
           promotion,
           status,
           finalUrl,
+          statsUrl: statsRes.url,
+          formTokenFound: Boolean(formToken),
+          userIdFound: Boolean(userId),
           cookie_length: offerSession.cookie_header.length,
           cookie_names: getCookieNames(offerSession.cookie_header),
           message,
