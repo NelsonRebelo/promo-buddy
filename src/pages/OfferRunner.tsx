@@ -117,6 +117,11 @@ const OfferRunner = () => {
   const preparedRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef(false);
   const ROWS_PER_PAGE = 10;
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.filter((r) => !r.success).length;
+  const progress = rows.length > 0 ? (completed / rows.length) * 100 : 0;
+  const totalRowsPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const paginatedRows = rows.slice((rowsPage - 1) * ROWS_PER_PAGE, rowsPage * ROWS_PER_PAGE);
 
   useEffect(() => {
     getOfferStatus()
@@ -255,12 +260,6 @@ const OfferRunner = () => {
     }
     navigate("/", { replace: true });
   };
-
-  const successCount = results.filter((r) => r.success).length;
-  const failCount = results.filter((r) => !r.success).length;
-  const progress = rows.length > 0 ? (completed / rows.length) * 100 : 0;
-  const totalRowsPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
-  const paginatedRows = rows.slice((rowsPage - 1) * ROWS_PER_PAGE, rowsPage * ROWS_PER_PAGE);
 
   if (checking) {
     return (
