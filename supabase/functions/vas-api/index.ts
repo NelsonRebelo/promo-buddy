@@ -342,8 +342,9 @@ async function enrichOfferAdminSession(
   );
   const paramsText = await paramsRes.text();
 
+  const usercardsUserId = getCookieValue(buildCookieHeader(jar), "user_id") || "6";
   const usercardsRes = await followRedirects(
-    "https://www.standvirtual.com/adminpanel/usercards/?search%5Buser_id%5D=6",
+    `https://www.standvirtual.com/adminpanel/usercards/?search%5Buser_id%5D=${encodeURIComponent(usercardsUserId)}`,
     jar,
     {
       method: "GET",
