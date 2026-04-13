@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { getStatus, sendVas, logout } from "@/lib/api";
+import { InspirationalQuote } from "@/components/InspirationalQuote";
 
 type CsvRow = { advert: string; promotion: string };
 type PromotionOption = { name: string; id: string };
@@ -717,17 +718,17 @@ const Runner = () => {
                       <Table>
                         <TableHeader>
                           <TableRow className="hover:bg-transparent">
-                            <TableHead>Advert</TableHead>
-                            <TableHead>Promotion</TableHead>
-                            <TableHead>Message</TableHead>
+                            <TableHead className="text-center">Advert</TableHead>
+                            <TableHead className="text-center">Promotion</TableHead>
+                            <TableHead className="text-center">Message</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {paginatedFailures.map((f, i) => (
                             <TableRow key={i} className="transition-colors hover:bg-white/70">
-                              <TableCell>{f.advert}</TableCell>
-                              <TableCell>{getPromotionLabel(f.promotion) || f.promotion}</TableCell>
-                              <TableCell className="max-w-xs truncate text-sm">
+                              <TableCell className="text-center">{f.advert}</TableCell>
+                              <TableCell className="text-center">{getPromotionLabel(f.promotion) || f.promotion}</TableCell>
+                              <TableCell className="max-w-xs truncate text-center text-sm">
                                 {getParsedMessage(f.errorMessage)}
                               </TableCell>
                             </TableRow>
@@ -789,10 +790,10 @@ const Runner = () => {
       {confirmOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] border border-white/80 bg-white/95 p-6 shadow-2xl">
-            <p className="text-base leading-7 text-slate-800">
+            <p className="text-center text-base leading-7 text-slate-800">
               These VAS will be <strong>NOT BE FREE</strong> to the seller. Are you sure?
             </p>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex justify-center gap-3">
               <Button
                 type="button"
                 variant="outline"
@@ -816,6 +817,7 @@ const Runner = () => {
           </div>
         </div>
       )}
+      <InspirationalQuote />
     </div>
   );
 };

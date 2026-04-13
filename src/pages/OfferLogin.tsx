@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, ShieldEllipsis } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -71,14 +71,10 @@ const OfferLogin = () => {
       <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
         <div className="relative mx-auto w-full max-w-md">
           <Card className="glass rounded-3xl border-white/80">
-            <CardHeader className="space-y-2 pb-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <ShieldEllipsis className="h-5 w-5" strokeWidth={1.8} />
-              </div>
-              <CardTitle className="text-2xl font-semibold tracking-tight">Offer promotion login</CardTitle>
+            <CardHeader className="items-center space-y-4 pb-2 text-center">
+              <img src="/olx-group-logo.png" alt="OLX Group" className="h-12 w-auto object-contain" />
               <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-                Enter your Standvirtual credentials so Promo Buddy can attempt the Offer Promotion
-                login flow server-side.
+                Login with your OKTA credentials
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { clearOfferSession, getOfferStatus, sendOfferPromotion } from "@/lib/api";
+import { InspirationalQuote } from "@/components/InspirationalQuote";
 
 type CsvRow = { advert: string; promotion: string };
 type PromotionOption = { name: string; id: string };
@@ -662,17 +663,17 @@ const OfferRunner = () => {
                         <Table>
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
-                              <TableHead>Advert</TableHead>
-                              <TableHead>Promotion</TableHead>
-                              <TableHead>Message</TableHead>
+                              <TableHead className="text-center">Advert</TableHead>
+                              <TableHead className="text-center">Promotion</TableHead>
+                              <TableHead className="text-center">Message</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {paginatedFailures.map((result, i) => (
                               <TableRow key={`${result.advert}-${result.promotion}-${i}`} className="transition-colors hover:bg-white/70">
-                                <TableCell>{result.advert}</TableCell>
-                                <TableCell>{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
-                                <TableCell className="max-w-sm truncate text-sm text-muted-foreground">
+                                <TableCell className="text-center">{result.advert}</TableCell>
+                                <TableCell className="text-center">{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
+                                <TableCell className="max-w-sm truncate text-center text-sm text-muted-foreground">
                                   {OFFER_FAILURE_MESSAGE}
                                 </TableCell>
                               </TableRow>
@@ -735,10 +736,10 @@ const OfferRunner = () => {
       {confirmOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] border border-white/80 bg-white/95 p-6 shadow-2xl">
-            <p className="text-base leading-7 text-slate-800">
+            <p className="text-center text-base leading-7 text-slate-800">
               These VAS will be <strong>FREE</strong> to the seller. Are you sure?
             </p>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex justify-center gap-3">
               <Button
                 type="button"
                 variant="outline"
@@ -762,6 +763,7 @@ const OfferRunner = () => {
           </div>
         </div>
       )}
+      <InspirationalQuote />
     </div>
   );
 };

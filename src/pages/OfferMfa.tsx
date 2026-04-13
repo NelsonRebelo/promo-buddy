@@ -56,9 +56,7 @@ const OfferMfa = () => {
     setError("");
     setDiagnostics("");
     setLoading(true);
-    setStatus(
-      `Approve the ${selectedFactor.factorType === "signed_nonce" ? "FastPass" : "push notification"} request on your device.`,
-    );
+    setStatus("Approve the push notification request on your device.");
     try {
       const res = await offerVerifyMfa({
         state_token: challenge.state_token,
@@ -111,17 +109,13 @@ const OfferMfa = () => {
       <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
         <div className="relative mx-auto w-full max-w-md">
           <Card className="glass rounded-3xl border-white/80">
-            <CardHeader className="space-y-2 pb-2">
+            <CardHeader className="items-center space-y-2 pb-2 text-center">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <ShieldCheck className="h-5 w-5" strokeWidth={1.8} />
               </div>
               <CardTitle className="text-2xl font-semibold tracking-tight">Verify MFA</CardTitle>
               <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-                Approve the request using{" "}
-                {selectedFactor?.factorType === "signed_nonce"
-                  ? "FastPass"
-                  : selectedFactor?.label || selectedFactor?.vendorName || "your push factor"}
-                .
+                Approve the push notification request on your device.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -144,7 +138,7 @@ const OfferMfa = () => {
                     </pre>
                   </div>
                 )}
-                <div className="rounded-2xl border border-white/80 bg-white/70 px-4 py-4 text-sm text-muted-foreground">
+                <div className="rounded-2xl border border-white/80 bg-white/70 px-4 py-4 text-center text-sm text-muted-foreground">
                   {loading ? status : error ? "Approval did not complete." : "Ready to verify."}
                 </div>
                 <div className="flex gap-3">

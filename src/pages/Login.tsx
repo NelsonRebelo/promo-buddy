@@ -90,7 +90,7 @@ const Login = () => {
       <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
         <div className="relative mx-auto w-full max-w-md">
           <Card className="glass fade-up rounded-3xl border-white/80">
-            <CardHeader className="space-y-2 pb-2">
+            <CardHeader className="items-center space-y-2 pb-2 text-center">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <LockKeyhole className="h-5 w-5" strokeWidth={1.8} />
               </div>
