@@ -120,6 +120,7 @@ const FLIRTY_QUOTES = [
   "You are giving temptation with no warning label. 🫦🥵",
   "You look sweet, but that is clearly not the full story. 😏😳",
   "You are the kind of trouble people would choose twice. 🌶️🍑",
+  "I swear to you I won't stop until your legs are shaking and the neighbors know my name. 🫦",
 ];
 
 function pickNonRepeatingQuote(quotes: string[], storageKey: string) {
