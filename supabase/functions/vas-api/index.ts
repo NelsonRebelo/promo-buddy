@@ -6,6 +6,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-vas-session, x-offer-session, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const OFFER_BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36";
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -59,14 +62,47 @@ function buildCookieHeader(jar: CookieJar): string {
     .join("; ");
 }
 
+function getCookieNames(cookieHeader: string): string[] {
+  return cookieHeader
+    .split(";")
+    .map((cookie) => cookie.trim().split("=")[0])
+    .filter(Boolean);
+}
+
 const OFFER_STANDVIRTUAL_COOKIE_ALLOWLIST = new Set([
+  "_cc_id",
+  "_fbp",
+  "_ga",
+  "_ga_12HMJDM6HW",
+  "_ga_L97YMGPQ5R",
+  "_ga_TNE2ND3YPW",
+  "_ga_TZSL9M69RL",
+  "_gcl_au",
+  "_gfp_64b",
+  "_gads",
+  "_gpi",
+  "_hjSessionUser_5591",
+  "_pk_id.341094.59fa",
+  "_sharedid",
+  "_sharedid_cst",
+  "_tt_enable_cookie",
+  "_ttp",
   "__gfp_64b",
+  "__diug",
+  "__eoi",
   "__Host-next-auth.csrf-token",
   "__Secure-next-auth.callback-url",
   "__Secure-next-auth.session-token",
+  "__rtbh.lid",
+  "__rtbh.uid",
   "ab.storage.deviceId.e445935b-777a-429f-9f37-ac9297914d6e",
   "ab.storage.sessionId.e445935b-777a-429f-9f37-ac9297914d6e",
   "ab.storage.userId.e445935b-777a-429f-9f37-ac9297914d6e",
+  "ab._gd",
+  "ads_display_type",
+  "client_id",
+  "cto_bidid",
+  "cto_bundle",
   "datadome",
   "PHPSESSID",
   "ldf",
@@ -77,12 +113,26 @@ const OFFER_STANDVIRTUAL_COOKIE_ALLOWLIST = new Set([
   "lqstatus",
   "dfp_user_id",
   "id_token",
+  "intercom-device-id-f86h7xdx",
+  "intercom-id-f86h7xdx",
+  "invite",
+  "laquesis_result",
+  "laquesis_result_tmp",
+  "laquesissu",
   "mobile_default",
+  "ock",
   "OptanonAlertBoxClosed",
   "OptanonConsent",
   "OTAdditionalConsentString",
+  "posting_notice",
   "refresh_token",
+  "salesforce",
+  "SERVERID",
   "test",
+  "ttcsid",
+  "ttcsid_D3B5E4JC77UCTDLGQA20",
+  "user_id",
+  "uuid",
   "eupubconsent-v2",
 ]);
 
@@ -139,7 +189,7 @@ async function followRedirects(
     response = await fetchWithJar(url, jar, {
       method: "GET",
       headers: {
-        "User-Agent": "Mozilla/5.0 PromoBuddy/1.0",
+        "User-Agent": OFFER_BROWSER_USER_AGENT,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });
@@ -150,7 +200,7 @@ async function followRedirects(
 }
 
 async function primeOfferStandvirtualCookies(jar: CookieJar) {
-  const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+  const userAgent = OFFER_BROWSER_USER_AGENT;
 
   await followRedirects("https://www.standvirtual.com/adminpanel/", jar, {
     method: "GET",
@@ -195,7 +245,7 @@ async function enrichOfferAdminSession(
   validated: boolean;
   validatedUrl: string;
 }> {
-  const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+  const userAgent = OFFER_BROWSER_USER_AGENT;
   let statsHtml = "";
   let validatedUrl = initialStatsResponse.url;
 
@@ -284,7 +334,7 @@ async function completeOfferSessionFromSessionToken(
   jar: CookieJar,
   supabaseAdmin: ReturnType<typeof createClient>,
 ) {
-  const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+  const userAgent = OFFER_BROWSER_USER_AGENT;
   const authorizeWithSession = new URL(authorizeUrl);
   authorizeWithSession.searchParams.set("sessionToken", sessionToken);
 
@@ -335,7 +385,7 @@ async function completeOfferSessionFromStateToken(
   jar: CookieJar,
   supabaseAdmin: ReturnType<typeof createClient>,
 ) {
-  const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+  const userAgent = OFFER_BROWSER_USER_AGENT;
   const oktaRedirectUrl =
     `https://olxgroup.okta-emea.com/login/token/redirect?stateToken=${encodeURIComponent(stateToken)}`;
 
@@ -456,7 +506,7 @@ async function pollForOfferSessionToken(
   stateToken: string,
   jar: CookieJar,
 ): Promise<{ sessionToken: string | null; stateToken?: string | null; detail?: string }> {
-  const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+  const userAgent = OFFER_BROWSER_USER_AGENT;
 
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await sleep(2000);
@@ -540,7 +590,7 @@ Deno.serve(async (req) => {
       }
 
       const jar: CookieJar = new Map();
-      const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+      const userAgent = OFFER_BROWSER_USER_AGENT;
 
       await primeOfferStandvirtualCookies(jar);
 
@@ -646,7 +696,7 @@ Deno.serve(async (req) => {
       }
 
       const jar: CookieJar = new Map();
-      const userAgent = "Mozilla/5.0 PromoBuddy/1.0";
+      const userAgent = OFFER_BROWSER_USER_AGENT;
 
       const verifyUrl = `https://olxgroup.okta-emea.com/api/v1/authn/factors/${encodeURIComponent(factor_id)}/verify`;
       const verifyRes = await fetchWithJar(
@@ -761,6 +811,8 @@ Deno.serve(async (req) => {
       return json({
         loggedIn: true,
         cookie: offerSession.cookie_header,
+        cookie_length: offerSession.cookie_header.length,
+        cookie_names: getCookieNames(offerSession.cookie_header),
         expires_at: offerSession.expires_at,
       });
     }
@@ -843,6 +895,8 @@ Deno.serve(async (req) => {
           promotion,
           status,
           finalUrl,
+          cookie_length: offerSession.cookie_header.length,
+          cookie_names: getCookieNames(offerSession.cookie_header),
           message,
           errorMessage: success ? undefined : message,
         }, success ? 200 : status >= 400 ? status : 502);
