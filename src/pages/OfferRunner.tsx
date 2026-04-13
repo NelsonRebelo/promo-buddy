@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import {
   ArrowLeft,
+  CheckCircle2,
   Copy,
   Loader2,
   LogOut,
@@ -68,6 +69,10 @@ const PROMOTION_OPTIONS: PromotionOption[] = [
 
 const EXPORT_OLX_ID = "49";
 const CONCURRENCY = 5;
+const REQUEST_DELAY_MS = 300;
+const OFFER_FAILURE_MESSAGE = "Unable to apply VAS";
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -110,19 +115,25 @@ const OfferRunner = () => {
   const [manualPromotionIds, setManualPromotionIds] = useState<string[]>([]);
   const [manualError, setManualError] = useState("");
   const [rowsPage, setRowsPage] = useState(1);
-  const [copyingRows, setCopyingRows] = useState(false);
-  const [showPreparedNotice, setShowPreparedNotice] = useState(false);
+  const [failuresPage, setFailuresPage] = useState(1);
+  const [copyingFailures, setCopyingFailures] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const preparedRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef(false);
   const ROWS_PER_PAGE = 10;
+  const FAILURES_PER_PAGE = 8;
   const successCount = results.filter((r) => r.success).length;
   const failCount = results.filter((r) => !r.success).length;
+  const failures = results.filter((r) => !r.success);
   const progress = rows.length > 0 ? (completed / rows.length) * 100 : 0;
   const totalRowsPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
-  const totalResultPages = Math.max(1, Math.ceil(results.length / ROWS_PER_PAGE));
+  const totalFailurePages = Math.max(1, Math.ceil(failures.length / FAILURES_PER_PAGE));
   const paginatedRows = rows.slice((rowsPage - 1) * ROWS_PER_PAGE, rowsPage * ROWS_PER_PAGE);
-  const paginatedResults = results.slice((rowsPage - 1) * ROWS_PER_PAGE, rowsPage * ROWS_PER_PAGE);
+  const paginatedFailures = failures.slice(
+    (failuresPage - 1) * FAILURES_PER_PAGE,
+    failuresPage * FAILURES_PER_PAGE,
+  );
 
   useEffect(() => {
     getOfferStatus()
@@ -148,7 +159,7 @@ const OfferRunner = () => {
     setDone(false);
     setCompleted(0);
     setRowsPage(1);
-    setShowPreparedNotice(false);
+    setFailuresPage(1);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -193,7 +204,7 @@ const OfferRunner = () => {
     setDone(false);
     setCompleted(0);
     setRowsPage(1);
-    setShowPreparedNotice(false);
+    setFailuresPage(1);
     setManualAdvertsText("");
     setManualPromotionIds([]);
   };
@@ -201,17 +212,30 @@ const OfferRunner = () => {
   const getPromotionLabel = (promotionId: string) =>
     PROMOTION_OPTIONS.find((option) => option.id === promotionId)?.name;
 
-  const copyResultRows = async () => {
-    if (results.length === 0) return;
-    const clipboardText = results
-      .map((row) => `${row.advert}\t${getPromotionLabel(row.promotion) || row.promotion}\t${row.success ? "Success" : "Failed"}\t${row.errorMessage || row.status}`)
+  const clearRows = () => {
+    setRows([]);
+    setResults([]);
+    setDone(false);
+    setCompleted(0);
+    setRowsPage(1);
+    setFailuresPage(1);
+    setCsvError("");
+    setManualError("");
+    setConfirmOpen(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const copyFailedRequests = async () => {
+    if (failures.length === 0) return;
+    const clipboardText = failures
+      .map((row) => `${row.advert}\t${getPromotionLabel(row.promotion) || row.promotion}`)
       .join("\n");
 
     try {
-      setCopyingRows(true);
+      setCopyingFailures(true);
       await navigator.clipboard.writeText(clipboardText);
     } finally {
-      window.setTimeout(() => setCopyingRows(false), 1200);
+      window.setTimeout(() => setCopyingFailures(false), 1200);
     }
   };
 
@@ -221,7 +245,6 @@ const OfferRunner = () => {
     setDone(false);
     setResults([]);
     setCompleted(0);
-    setShowPreparedNotice(false);
 
     const allResults: Result[] = [];
     let idx = 0;
@@ -250,6 +273,10 @@ const OfferRunner = () => {
         }
         setCompleted((c) => c + 1);
         setResults([...allResults]);
+
+        if (!cancelRef.current && idx < rows.length) {
+          await sleep(REQUEST_DELAY_MS);
+        }
       }
     };
 
@@ -257,7 +284,6 @@ const OfferRunner = () => {
     await Promise.all(workers);
     setRunning(false);
     setDone(true);
-    setShowPreparedNotice(true);
   };
 
   const handleLogout = () => {
@@ -299,7 +325,7 @@ const OfferRunner = () => {
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             Back
           </Button>
-          <img src="/promobuddy-logo.png" alt="Promo Buddy" className="h-9 w-auto rounded-full object-contain" />
+          <img src="/promobuddy-home-logo.png" alt="Promo Buddy" className="h-10 w-auto object-contain" />
           <Button
             variant="ghost"
             size="sm"
@@ -316,17 +342,7 @@ const OfferRunner = () => {
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="space-y-8">
             <Card className="glass rounded-[2rem] border-white/80 bg-white/84 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-semibold tracking-tight">Add Adverts Manually</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="rounded-2xl border border-sky-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(239,246,255,0.88))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-                  <p className="mb-1 text-sm font-semibold text-slate-800">Warning</p>
-                  <p className="text-sm leading-6 text-slate-600">
-                    The VAS you are about to add is paid by the client. Be cautious and sure of what you are doing
-                  </p>
-                </div>
-
+              <CardContent className="space-y-5 pt-6">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -448,13 +464,25 @@ const OfferRunner = () => {
 
                 {rows.length > 0 && (
                   <div className="space-y-3 rounded-2xl border border-white/80 bg-white/84 p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-medium text-muted-foreground">
                         {rows.length} row{rows.length !== 1 ? "s" : ""} loaded
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        Page {rowsPage} of {totalRowsPages}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-xs text-muted-foreground">
+                          Page {rowsPage} of {totalRowsPages}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={clearRows}
+                          disabled={running}
+                          className="h-8 rounded-full border-white/80 bg-white/70 px-3 text-xs"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                     </div>
                     <div className="overflow-hidden rounded-2xl border border-white/75 bg-white/80">
                       <div className="overflow-auto">
@@ -544,7 +572,7 @@ const OfferRunner = () => {
                 </div>
                 <div className="w-full max-w-xs space-y-2">
                   <Button
-                    onClick={run}
+                    onClick={() => setConfirmOpen(true)}
                     disabled={running || rows.length === 0}
                     className="h-11 w-full rounded-xl text-sm shadow-sm transition-all duration-300 hover:shadow-md"
                   >
@@ -611,88 +639,70 @@ const OfferRunner = () => {
             <Card ref={preparedRef} className="glass rounded-3xl border-white/75 xl:col-span-2">
               <CardHeader className="pb-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-lg font-semibold tracking-tight">Offer promotion results</CardTitle>
-                  {rows.length > 0 && (
+                  <CardTitle className="text-lg font-semibold tracking-tight">Failed promotion details</CardTitle>
+                  {failures.length > 0 && (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={copyResultRows}
+                      onClick={copyFailedRequests}
                       className="rounded-full border-white/80 bg-white/70"
                     >
                       <Copy className="mr-2 h-4 w-4" />
-                      {copyingRows ? "Copied" : "Copy result rows"}
+                      {copyingFailures ? "Copied" : "Copy failed requests"}
                     </Button>
                   )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {showPreparedNotice && (
-                  <Alert className="rounded-2xl border-sky-200 bg-sky-50/80 text-sky-700">
-                    <AlertDescription>Rows were processed through the Offer promotion request flow.</AlertDescription>
-                  </Alert>
-                )}
-
-                {results.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {results.length} row{results.length !== 1 ? "s" : ""} processed
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Page {rowsPage} of {totalResultPages}
-                      </p>
-                    </div>
+                {failures.length > 0 && (
+                  <div className="space-y-3 overflow-hidden rounded-2xl border border-white/75 bg-white/72 p-0">
                     <div className="overflow-hidden rounded-2xl border border-white/75 bg-white/72 p-0">
-                    <div className="overflow-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="hover:bg-transparent">
-                            <TableHead>Advert</TableHead>
-                            <TableHead>Promotion</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Message</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {paginatedResults.map((result, i) => (
-                            <TableRow key={`${result.advert}-${result.promotion}-${i}`} className="transition-colors hover:bg-white/70">
-                              <TableCell>{result.advert}</TableCell>
-                              <TableCell>{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
-                              <TableCell className={result.success ? "text-sm font-medium text-emerald-700" : "text-sm font-medium text-rose-700"}>
-                                {result.success ? "Success" : "Failed"}
-                              </TableCell>
-                              <TableCell className="max-w-sm truncate text-sm text-muted-foreground">
-                                {result.errorMessage || result.status}
-                              </TableCell>
+                      <div className="overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead>Advert</TableHead>
+                              <TableHead>Promotion</TableHead>
+                              <TableHead>Message</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {paginatedFailures.map((result, i) => (
+                              <TableRow key={`${result.advert}-${result.promotion}-${i}`} className="transition-colors hover:bg-white/70">
+                                <TableCell>{result.advert}</TableCell>
+                                <TableCell>{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
+                                <TableCell className="max-w-sm truncate text-sm text-muted-foreground">
+                                  {OFFER_FAILURE_MESSAGE}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
-                  </div>
-                    {totalResultPages > 1 && (
-                      <div className="flex items-center justify-between gap-3">
+                    {totalFailurePages > 1 && (
+                      <div className="flex items-center justify-between gap-3 px-4 pb-4">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="rounded-full"
-                          disabled={rowsPage === 1}
-                          onClick={() => setRowsPage((page) => Math.max(1, page - 1))}
+                          disabled={failuresPage === 1}
+                          onClick={() => setFailuresPage((page) => Math.max(1, page - 1))}
                         >
                           Previous
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                          Showing {paginatedResults.length} of {results.length}
+                          Page {failuresPage} of {totalFailurePages}
                         </p>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="rounded-full"
-                          disabled={rowsPage === totalResultPages}
-                          onClick={() => setRowsPage((page) => Math.min(totalResultPages, page + 1))}
+                          disabled={failuresPage === totalFailurePages}
+                          onClick={() => setFailuresPage((page) => Math.min(totalFailurePages, page + 1))}
                         >
                           Next
                         </Button>
@@ -701,15 +711,16 @@ const OfferRunner = () => {
                   </div>
                 )}
 
+                {failures.length === 0 && results.length > 0 && (
+                  <Alert className="rounded-2xl border-emerald-200 bg-emerald-50/80 text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <AlertDescription>All rows completed successfully.</AlertDescription>
+                  </Alert>
+                )}
+
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setRows([]);
-                    setResults([]);
-                    setDone(false);
-                    setCompleted(0);
-                    setShowPreparedNotice(false);
-                  }}
+                  onClick={clearRows}
                   className="h-11 rounded-xl border-white/80 bg-white/60 px-5 hover:bg-white/85"
                 >
                   <Upload className="mr-2 h-4 w-4" />
@@ -720,6 +731,37 @@ const OfferRunner = () => {
           )}
         </div>
       </main>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[2rem] border border-white/80 bg-white/95 p-6 shadow-2xl">
+            <p className="text-base leading-7 text-slate-800">
+              These VAS will be <strong>FREE</strong> to the seller. Are you sure?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmOpen(false)}
+                className="rounded-full border-slate-200 bg-white px-5"
+              >
+                No
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  void run();
+                }}
+                className="rounded-full border-slate-200 bg-white px-5"
+              >
+                Yes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

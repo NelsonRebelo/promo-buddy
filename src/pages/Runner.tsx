@@ -120,6 +120,9 @@ function getParsedMessage(errorMessage?: string): string {
 }
 
 const CONCURRENCY = 5;
+const REQUEST_DELAY_MS = 300;
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const Runner = () => {
   const navigate = useNavigate();
@@ -136,6 +139,7 @@ const Runner = () => {
   const [rowsPage, setRowsPage] = useState(1);
   const [failuresPage, setFailuresPage] = useState(1);
   const [copyingFailures, setCopyingFailures] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const failedDetailsRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef(false);
@@ -216,6 +220,19 @@ const Runner = () => {
   const getPromotionLabel = (promotionId: string) =>
     PROMOTION_OPTIONS.find((option) => option.id === promotionId)?.name;
 
+  const clearRows = () => {
+    setRows([]);
+    setResults([]);
+    setDone(false);
+    setCompleted(0);
+    setRowsPage(1);
+    setFailuresPage(1);
+    setCsvError("");
+    setManualError("");
+    setConfirmOpen(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const copyFailedRequests = async () => {
     if (failures.length === 0) return;
     const clipboardText = failures
@@ -263,13 +280,13 @@ const Runner = () => {
           };
 
           allResults.push(result);
-        } catch (err: any) {
+        } catch (err) {
           const result: Result = {
             advert: row.advert,
             promotion: row.promotion,
             success: false,
             status: "network error",
-            errorMessage: err.message || "Network error",
+            errorMessage: err instanceof Error ? err.message : "Network error",
           };
 
           allResults.push(result);
@@ -277,6 +294,10 @@ const Runner = () => {
 
         setCompleted((c) => c + 1);
         setResults([...allResults]);
+
+        if (!cancelRef.current && idx < rows.length) {
+          await sleep(REQUEST_DELAY_MS);
+        }
       }
     };
 
@@ -344,9 +365,9 @@ const Runner = () => {
             Back
           </Button>
           <img
-            src="/promobuddy-logo.png"
+            src="/promobuddy-home-logo.png"
             alt="Promo Buddy"
-            className="h-9 w-auto rounded-full object-contain"
+            className="h-10 w-auto object-contain"
           />
           <Button
             variant="ghost"
@@ -364,10 +385,7 @@ const Runner = () => {
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="space-y-8">
             <Card className="glass rounded-[2rem] border-white/80 bg-white/84 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-semibold tracking-tight">Add Adverts Manually</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-5 pt-6">
                 <div className="rounded-2xl border border-sky-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(239,246,255,0.88))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <p className="mb-1 text-sm font-semibold text-slate-800">Warning</p>
                   <p className="text-sm leading-6 text-slate-600">
@@ -498,13 +516,25 @@ const Runner = () => {
 
                 {rows.length > 0 && (
                   <div className="space-y-3 rounded-2xl border border-white/80 bg-white/84 p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-medium text-muted-foreground">
                         {rows.length} row{rows.length !== 1 ? "s" : ""} loaded
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        Page {rowsPage} of {totalRowsPages}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-xs text-muted-foreground">
+                          Page {rowsPage} of {totalRowsPages}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={clearRows}
+                          disabled={running}
+                          className="h-8 rounded-full border-white/80 bg-white/70 px-3 text-xs"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                     </div>
                     <div className="overflow-hidden rounded-2xl border border-white/75 bg-white/80">
                       <div className="overflow-auto">
@@ -594,7 +624,7 @@ const Runner = () => {
                 </div>
                 <div className="w-full max-w-xs space-y-2">
                   <Button
-                    onClick={run}
+                    onClick={() => setConfirmOpen(true)}
                     disabled={running || rows.length === 0}
                     className="h-11 w-full rounded-xl text-sm shadow-sm transition-all duration-300 hover:shadow-md"
                   >
@@ -744,12 +774,7 @@ const Runner = () => {
 
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setRows([]);
-                    setResults([]);
-                    setDone(false);
-                    setCompleted(0);
-                  }}
+                  onClick={clearRows}
                   className="h-11 rounded-xl border-white/80 bg-white/60 px-5 hover:bg-white/85"
                 >
                   <Upload className="mr-2 h-4 w-4" />
@@ -760,6 +785,37 @@ const Runner = () => {
           )}
         </div>
       </main>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[2rem] border border-white/80 bg-white/95 p-6 shadow-2xl">
+            <p className="text-base leading-7 text-slate-800">
+              These VAS will be <strong>NOT BE FREE</strong> to the seller. Are you sure?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmOpen(false)}
+                className="rounded-full border-slate-200 bg-white px-5"
+              >
+                No
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  void run();
+                }}
+                className="rounded-full border-slate-200 bg-white px-5"
+              >
+                Yes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
