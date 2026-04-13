@@ -31,7 +31,9 @@ function getSetCookieValues(headers: Headers): string[] {
   }
 
   const single = headers.get("set-cookie");
-  return single ? [single] : [];
+  if (!single) return [];
+
+  return single.split(/,(?=\s*[^;,\s]+=)/g).map((cookie) => cookie.trim()).filter(Boolean);
 }
 
 type CookieJar = Map<string, string>;
