@@ -343,7 +343,7 @@ const OfferRunner = () => {
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="space-y-8">
             <Card className="glass rounded-[2rem] border-white/80 bg-white/84 shadow-lg">
-              <CardContent className="space-y-5 pt-6">
+              <CardContent className="space-y-5 py-5">
                 <input
                   ref={fileInputRef}
                   type="file"

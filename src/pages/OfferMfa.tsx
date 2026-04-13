@@ -32,7 +32,6 @@ const OfferMfa = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [diagnostics, setDiagnostics] = useState("");
-  const [status, setStatus] = useState("Waiting for approval...");
 
   const selectedFactor =
     challenge?.factors?.find((factor) => factor.id === challenge.preferred_factor_id) ??
@@ -56,7 +55,6 @@ const OfferMfa = () => {
     setError("");
     setDiagnostics("");
     setLoading(true);
-    setStatus("Approve the push notification request on your device.");
     try {
       const res = await offerVerifyMfa({
         state_token: challenge.state_token,
@@ -138,9 +136,6 @@ const OfferMfa = () => {
                     </pre>
                   </div>
                 )}
-                <div className="rounded-2xl border border-white/80 bg-white/70 px-4 py-4 text-center text-sm text-muted-foreground">
-                  {loading ? status : error ? "Approval did not complete." : "Ready to verify."}
-                </div>
                 <div className="flex gap-3">
                   <Button
                     type="button"

@@ -386,7 +386,7 @@ const Runner = () => {
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="space-y-8">
             <Card className="glass rounded-[2rem] border-white/80 bg-white/84 shadow-lg">
-              <CardContent className="space-y-5 pt-6">
+              <CardContent className="space-y-5 py-5">
                 <div className="rounded-2xl border border-sky-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(239,246,255,0.88))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                   <p className="mb-1 text-sm font-semibold text-slate-800">Warning</p>
                   <p className="text-sm leading-6 text-slate-600">
