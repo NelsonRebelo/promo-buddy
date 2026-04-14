@@ -110,16 +110,16 @@ const FLIRTY_QUOTE_CHANCE = 0.3;
 const FLIRTY_ALLOWED_EMAILS = new Set(["rita.galvao@olx.com", "nelson.rebelo@olx.com"]);
 
 const FLIRTY_QUOTES = [
-  "You look like a bad decision in perfect packaging. 😏🌶️",
+  "You look like a bad decision in perfect packaging. 😏",
   "You are the reason self-control starts shaking. 🥵👀",
-  "You have that energy that turns heads and ruins focus. 😳🌶️",
+  "You have that energy that turns heads and ruins focus. 😳",
   "You are soft-looking and absolutely not safe. 😏🫦",
   "You walk in and suddenly the room forgets how to behave. 👀🥵",
   "You are the type people stare at, then regret staring at. 😳😏",
-  "You have danger written all over you, just beautifully. 🌶️👀",
+  "You have danger written all over you, just beautifully. 👀",
   "You are giving temptation with no warning label. 🫦🥵",
   "You look sweet, but that is clearly not the full story. 😏😳",
-  "You are the kind of trouble people would choose twice. 🌶️🍑",
+  "You are the kind of trouble people would choose twice. 🍑",
   "I swear to you I won't stop until your legs are shaking and the neighbors know my name. 🫦",
 ];
 
@@ -136,17 +136,17 @@ function pickNonRepeatingQuote(quotes: string[], storageKey: string) {
 }
 
 function getQuote() {
-  if (typeof window === "undefined") return QUOTES[0];
+  if (typeof window === "undefined") return { text: QUOTES[0], isFlirty: false };
 
   try {
     const email = getStoredAuthEmail()?.trim().toLowerCase();
     const canShowFlirty = Boolean(email && FLIRTY_ALLOWED_EMAILS.has(email));
     if (canShowFlirty && Math.random() < FLIRTY_QUOTE_CHANCE) {
-      return pickNonRepeatingQuote(FLIRTY_QUOTES, FLIRTY_STORAGE_KEY);
+      return { text: pickNonRepeatingQuote(FLIRTY_QUOTES, FLIRTY_STORAGE_KEY), isFlirty: true };
     }
-    return pickNonRepeatingQuote(QUOTES, STORAGE_KEY);
+    return { text: pickNonRepeatingQuote(QUOTES, STORAGE_KEY), isFlirty: false };
   } catch {
-    return QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    return { text: QUOTES[Math.floor(Math.random() * QUOTES.length)], isFlirty: false };
   }
 }
 
@@ -154,8 +154,12 @@ export function InspirationalQuote() {
   const quote = useMemo(() => getQuote(), []);
 
   return (
-    <aside className="pointer-events-none fixed bottom-4 right-4 z-40 hidden max-w-[260px] rounded-2xl border border-white/70 bg-white/55 px-4 py-3 text-right text-xs leading-5 text-slate-500 shadow-sm backdrop-blur-xl md:block">
-      {quote}
+    <aside
+      className={`pointer-events-none fixed bottom-4 right-4 z-40 hidden max-w-[260px] rounded-2xl border border-white/70 bg-white/55 px-4 py-3 text-right text-xs leading-5 shadow-sm backdrop-blur-xl md:block ${
+        quote.isFlirty ? "text-slate-500/70" : "text-slate-500"
+      }`}
+    >
+      {quote.text}
     </aside>
   );
 }
