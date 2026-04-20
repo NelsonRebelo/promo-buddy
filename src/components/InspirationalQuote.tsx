@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { getStoredAuthEmail } from "@/lib/api";
 
 const QUOTES = [
@@ -111,16 +111,34 @@ const FLIRTY_ALLOWED_EMAILS = new Set(["rita.galvao@olx.com", "nelson.rebelo@olx
 
 const FLIRTY_QUOTES = [
   "You look like a bad decision in perfect packaging. 😏",
-  "You are the reason self-control starts shaking. 🥵👀",
-  "You have that energy that turns heads and ruins focus. 😳",
-  "You are soft-looking and absolutely not safe. 😏🫦",
-  "You walk in and suddenly the room forgets how to behave. 👀🥵",
-  "You are the type people stare at, then regret staring at. 😳😏",
-  "You have danger written all over you, just beautifully. 👀",
-  "You are giving temptation with no warning label. 🫦🥵",
-  "You look sweet, but that is clearly not the full story. 😏😳",
-  "You are the kind of trouble people would choose twice. 🍑",
-  "I swear to you I won't stop until your legs are shaking and the neighbors know my name. 🫦",
+  "You are the reason self-control starts shaking. 😏",
+  "You have that energy that turns heads and ruins focus. 😏",
+  "You are soft-looking and absolutely not safe. 😏",
+  "You walk in and suddenly the room forgets how to behave. 😏",
+  "You are the type people stare at, then regret staring at. 😏",
+  "You have danger written all over you, just beautifully. 😏",
+  "You are giving temptation with no warning label. 😏",
+  "You look sweet, but that is clearly not the full story. 😏",
+  "You are the kind of trouble people would choose twice. 😏",
+  "I swear to you I won't stop until your legs are shaking and the neighbors know my name. 😏",
+  "Are you tired? You've been running through my mind all day. 😏",
+  "I should complain to Spotify for not making you this week's hottest single. 😏",
+  "You look so familiar...did we have class together? I could've sworn we had chemistry. 😏",
+  "Are you a charger? Because I'm dying without you. 😏",
+  "Wanna be Minecraft without the craft? 😏",
+  "Are you a Mariah Carey song? Because All I Want for Christmas Is You. 😏",
+  "Are you a magician? Because when I look at you, everyone else disappears. 😏",
+  "Well, here I am! What are your other two wishes? 😏",
+  "Did you use your \"contenção\" today? 😏",
+  "Opening Promo Buddy again just to read this, uh? I see you... 😏",
+  "Do you have a map? Because I just got lost in your eyes. 😏",
+  "Did you just come out of an oven? Because you're too hot to handle. 😏",
+  "You are making it very hard to act normal. 😏",
+  "I blame you for this sudden loss of focus. 😏",
+  "I was not planning on catching feelings today, yet here we are. 😏",
+  "Not sure if I told you this before but, your eyes are beautiful. 😏",
+  "If you only knew what my mouth and hands are capable of... 😏",
+  "I can see us being the stars on one of those books you read... 😏",
 ];
 
 function pickNonRepeatingQuote(quotes: string[], storageKey: string) {
@@ -152,13 +170,24 @@ function getQuote() {
 
 export function InspirationalQuote() {
   const quote = useMemo(() => getQuote(), []);
+  const [isVisible, setIsVisible] = useState(true);
+
+  if (!isVisible) return null;
 
   return (
     <aside
-      className={`pointer-events-none fixed bottom-4 right-4 z-40 hidden max-w-[260px] rounded-2xl border border-white/70 bg-white/55 px-4 py-3 text-right text-xs leading-5 shadow-sm backdrop-blur-xl md:block ${
+      className={`fixed bottom-4 right-4 z-40 hidden max-w-[260px] rounded-2xl border border-white/70 bg-white/55 px-4 py-3 pr-8 text-right text-xs leading-5 shadow-sm backdrop-blur-xl md:block ${
         quote.isFlirty ? "text-slate-500/70" : "text-slate-500"
       }`}
     >
+      <button
+        type="button"
+        aria-label="Close quote"
+        onClick={() => setIsVisible(false)}
+        className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-slate-400/80 transition hover:bg-white/70 hover:text-slate-600"
+      >
+        ×
+      </button>
       {quote.text}
     </aside>
   );
