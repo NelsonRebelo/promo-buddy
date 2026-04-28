@@ -105,40 +105,34 @@ const QUOTES = [
 ];
 
 const STORAGE_KEY = "promo-buddy-seen-quotes";
-const FLIRTY_STORAGE_KEY = "promo-buddy-seen-flirty-quotes";
-const FLIRTY_QUOTE_CHANCE = 0.3;
+const CUSTOM_STORAGE_KEY = "promo-buddy-seen-custom-quotes";
 const FLIRTY_ALLOWED_EMAILS = new Set(["rita.galvao@olx.com", "nelson.rebelo@olx.com"]);
 
 const FLIRTY_QUOTES = [
-  "You look like a bad decision in perfect packaging. 😏",
-  "You are the reason self-control starts shaking. 😏",
-  "You have that energy that turns heads and ruins focus. 😏",
-  "You are soft-looking and absolutely not safe. 😏",
-  "You walk in and suddenly the room forgets how to behave. 😏",
-  "You are the type people stare at, then regret staring at. 😏",
-  "You have danger written all over you, just beautifully. 😏",
-  "You are giving temptation with no warning label. 😏",
-  "You look sweet, but that is clearly not the full story. 😏",
-  "You are the kind of trouble people would choose twice. 😏",
-  "I swear to you I won't stop until your legs are shaking and the neighbors know my name. 😏",
-  "Are you tired? You've been running through my mind all day. 😏",
-  "I should complain to Spotify for not making you this week's hottest single. 😏",
-  "You look so familiar...did we have class together? I could've sworn we had chemistry. 😏",
-  "Are you a charger? Because I'm dying without you. 😏",
-  "Wanna be Minecraft without the craft? 😏",
-  "Are you a Mariah Carey song? Because All I Want for Christmas Is You. 😏",
-  "Are you a magician? Because when I look at you, everyone else disappears. 😏",
-  "Well, here I am! What are your other two wishes? 😏",
-  "Did you use your \"contenção\" today? 😏",
-  "Opening Promo Buddy again just to read this, uh? I see you... 😏",
-  "Do you have a map? Because I just got lost in your eyes. 😏",
-  "Did you just come out of an oven? Because you're too hot to handle. 😏",
-  "You are making it very hard to act normal. 😏",
-  "I blame you for this sudden loss of focus. 😏",
-  "I was not planning on catching feelings today, yet here we are. 😏",
-  "Not sure if I told you this before but, your eyes are beautiful. 😏",
-  "If you only knew what my mouth and hands are capable of... 😏",
-  "I can see us being the stars on one of those books you read... 😏",
+  "Tenho imenso orgulho em ti.",
+  "Obrigado por tudo. És incrível.",
+  "Tu és forte. Mais do que imaginas.",
+  "Vai melhorar. Mesmo que agora não pareça.",
+  "Obrigado por seres quem és.",
+  "Estou muito orgulhoso de quem me ajudaste a tornar.",
+  "Tu consegues ultrapassar tudo!",
+  "És muito especial.",
+  "Obrigado por estares sempre aí.",
+  "Admiro-te muito.",
+  "Não desistas de ti.",
+  "Tenho orgulho na tua força.",
+  "Tu mereces o mundo.",
+  "És incrível, mesmo nos dias difíceis.",
+  "Gosto muito de ti.",
+  "Tenho orgulho na pessoa que és.",
+  "Obrigado pelo teu carinho.",
+  "A tua presença vale muito.",
+  "Tu és capaz de tudo.",
+  "Nunca te esqueças do teu valor.",
+  "Tenho muita admiração por ti.",
+  "Não estás sozinha.",
+  "Tu tornas tudo mais bonito.",
+  "Um dia de cada vez.",
 ];
 
 function pickNonRepeatingQuote(quotes: string[], storageKey: string) {
@@ -159,8 +153,8 @@ function getQuote() {
   try {
     const email = getStoredAuthEmail()?.trim().toLowerCase();
     const canShowFlirty = Boolean(email && FLIRTY_ALLOWED_EMAILS.has(email));
-    if (canShowFlirty && Math.random() < FLIRTY_QUOTE_CHANCE) {
-      return { text: pickNonRepeatingQuote(FLIRTY_QUOTES, FLIRTY_STORAGE_KEY), isFlirty: true };
+    if (canShowFlirty) {
+      return { text: pickNonRepeatingQuote(FLIRTY_QUOTES, CUSTOM_STORAGE_KEY), isFlirty: false };
     }
     return { text: pickNonRepeatingQuote(QUOTES, STORAGE_KEY), isFlirty: false };
   } catch {
