@@ -1062,8 +1062,14 @@ Deno.serve(async (req) => {
           finalUrl.includes("/login");
         const responseLooksLikeLogin =
           responseText.toLowerCase().includes("login");
-        const message = responseText.includes("Ad was paid successfully")
-          ? "Ad was paid successfully"
+        const successStatus = status === 200 || status === 201 || status === 202;
+        const success =
+          successStatus &&
+          !statsRedirectedToLogin &&
+          !paymentRedirectedToLogin &&
+          !responseLooksLikeLogin;
+        const message = success
+          ? "Offer promotion request completed successfully."
           : statsRedirectedToLogin
             ? "Standvirtual redirected to login. The captured cookie is not valid for this request."
           : paymentRedirectedToLogin
@@ -1071,9 +1077,6 @@ Deno.serve(async (req) => {
           : responseLooksLikeLogin
             ? "Standvirtual returned a login-like response for the payment request. Check this advert and promotion eligibility."
           : responseText.substring(0, 500) || `HTTP ${status}`;
-        const success =
-          (status === 200 || status === 201 || status === 202) &&
-          responseText.includes("Ad was paid successfully");
 
         return json({
           success,
