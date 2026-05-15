@@ -258,6 +258,61 @@ async function followRedirects(
   return response;
 }
 
+function extractHtmlRedirectUrl(html: string, baseUrl: string): string | null {
+  const patterns = [
+    /<meta[^>]+http-equiv=["']refresh["'][^>]+content=["'][^"']*url=([^"']+)["']/i,
+    /window\.location(?:\.href)?\s*=\s*["']([^"']+)["']/i,
+    /document\.location(?:\.href)?\s*=\s*["']([^"']+)["']/i,
+    /location\.replace\(\s*["']([^"']+)["']\s*\)/i,
+    /location\.assign\(\s*["']([^"']+)["']\s*\)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (!match?.[1]) continue;
+    const raw = match[1].replace(/&amp;/g, "&").trim();
+    try {
+      return new URL(raw, baseUrl).toString();
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+async function followOfferHtmlRedirects(
+  initialResponse: Response,
+  jar: CookieJar,
+  limit = 3,
+): Promise<{ response: Response; redirectChain: string[]; lastHtml: string }> {
+  let response = initialResponse;
+  let lastHtml = await response.clone().text().catch(() => "");
+  const redirectChain: string[] = [];
+
+  for (let hop = 0; hop < limit; hop += 1) {
+    const nextUrl = extractHtmlRedirectUrl(lastHtml, response.url);
+    if (!nextUrl) break;
+    redirectChain.push(nextUrl);
+    response = await followRedirects(
+      nextUrl,
+      jar,
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": OFFER_BROWSER_USER_AGENT,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+          Referer: response.url,
+        },
+      },
+    );
+    lastHtml = await response.clone().text().catch(() => "");
+  }
+
+  return { response, redirectChain, lastHtml };
+}
+
 async function primeOfferStandvirtualCookies(jar: CookieJar) {
   const userAgent = OFFER_BROWSER_USER_AGENT;
 
@@ -452,10 +507,11 @@ async function completeOfferSessionFromSessionToken(
       Referer: "https://olxgroup.okta-emea.com/",
     },
   });
+  const postAuth = await followOfferHtmlRedirects(finalResponse, jar);
 
-  const enriched = await enrichOfferAdminSession(jar, finalResponse);
+  const enriched = await enrichOfferAdminSession(jar, postAuth.response);
   const cookieHeader = buildOfferStandvirtualCookieHeader(jar);
-  const finalUrl = enriched.validatedUrl || finalResponse.url;
+  const finalUrl = enriched.validatedUrl || postAuth.response.url;
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
   if (!enriched.validated) {
@@ -470,6 +526,9 @@ async function completeOfferSessionFromSessionToken(
       usercards_url: enriched.usercardsUrl,
       stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
       params_loaded: enriched.paramsText.length > 0,
+      post_auth_url: postAuth.response.url,
+      html_redirect_chain: postAuth.redirectChain,
+      post_auth_snippet: postAuth.lastHtml.substring(0, 500),
       auth_path: "sessionTokenRedirect",
     }, 502);
   }
@@ -502,6 +561,8 @@ async function completeOfferSessionFromSessionToken(
     usercards_url: enriched.usercardsUrl,
     stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
     params_loaded: enriched.paramsText.length > 0,
+    post_auth_url: postAuth.response.url,
+    html_redirect_chain: postAuth.redirectChain,
   });
 }
 
@@ -523,10 +584,11 @@ async function completeOfferSessionFromStateToken(
       Referer: "https://olxgroup.okta-emea.com/",
     },
   });
+  const postAuth = await followOfferHtmlRedirects(finalResponse, jar);
 
-  const enriched = await enrichOfferAdminSession(jar, finalResponse);
+  const enriched = await enrichOfferAdminSession(jar, postAuth.response);
   const cookieHeader = buildOfferStandvirtualCookieHeader(jar);
-  const finalUrl = enriched.validatedUrl || finalResponse.url;
+  const finalUrl = enriched.validatedUrl || postAuth.response.url;
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
   if (!enriched.validated) {
@@ -541,6 +603,9 @@ async function completeOfferSessionFromStateToken(
       usercards_url: enriched.usercardsUrl,
       stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
       params_loaded: enriched.paramsText.length > 0,
+      post_auth_url: postAuth.response.url,
+      html_redirect_chain: postAuth.redirectChain,
+      post_auth_snippet: postAuth.lastHtml.substring(0, 500),
       auth_path: "stateTokenRedirect",
     }, 502);
   }
@@ -573,6 +638,8 @@ async function completeOfferSessionFromStateToken(
     usercards_url: enriched.usercardsUrl,
     stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
     params_loaded: enriched.paramsText.length > 0,
+    post_auth_url: postAuth.response.url,
+    html_redirect_chain: postAuth.redirectChain,
     auth_path: "stateTokenRedirect",
   });
 }
