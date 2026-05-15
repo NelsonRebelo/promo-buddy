@@ -1,7 +1,7 @@
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vas-api`;
+const OFFER_HELPER_URL = "http://127.0.0.1:43125";
 const SESSION_KEY = "vas_session_id";
 const OFFER_SESSION_KEY = "offer_session_id";
-const OFFER_MFA_KEY = "offer_mfa_challenge";
 const AUTH_EMAIL_KEY = "promo_buddy_auth_email";
 
 function setAuthEmail(email: string) {
@@ -40,39 +40,30 @@ function clearOfferSessionId() {
   localStorage.removeItem(OFFER_SESSION_KEY);
 }
 
-export type OfferMfaFactor = {
-  id: string;
-  factorType: string;
-  provider?: string | null;
-  vendorName?: string | null;
-  label?: string | null;
-  verifyHref?: string | null;
-};
-
-export type OfferMfaChallenge = {
-  state_token: string;
-  authorize_url: string;
-  factors: OfferMfaFactor[];
-  preferred_factor_id?: string | null;
-};
-
-function setOfferMfaChallenge(challenge: OfferMfaChallenge) {
-  localStorage.setItem(OFFER_MFA_KEY, JSON.stringify(challenge));
-}
-
-export function getOfferMfaChallenge(): OfferMfaChallenge | null {
-  const raw = localStorage.getItem(OFFER_MFA_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as OfferMfaChallenge;
-  } catch {
-    return null;
-  }
-}
-
-export function clearOfferMfaChallenge() {
-  localStorage.removeItem(OFFER_MFA_KEY);
-}
+export type OfferHelperSessionStatus =
+  | {
+      ok: true;
+      status: "starting" | "waiting_for_login";
+      session_id?: string;
+      message?: string | null;
+      validated_url?: string | null;
+      cookie_header?: string | null;
+      error?: string | null;
+    }
+  | {
+      ok: true;
+      status: "authenticated";
+      session_id: string;
+      message?: string | null;
+      validated_url: string;
+      cookie_header: string;
+    }
+  | {
+      ok: false;
+      status?: "failed";
+      error: string;
+      detail?: string;
+    };
 
 async function request(path: string, options: RequestInit = {}) {
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -113,6 +104,19 @@ async function offerRequest(path: string, options: RequestInit = {}) {
     ...options,
     headers,
   });
+}
+
+async function parseJsonResponse(res: Response, label: string) {
+  const text = await res.text();
+  if (!text) {
+    throw new Error(`${label} returned an empty response.`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${label} returned an invalid response: ${text.slice(0, 200)}`);
+  }
 }
 
 export async function login(data: { username: string; password: string }) {
@@ -156,42 +160,42 @@ export async function sendVas(advert: string, promotion: string) {
   return { status: res.status, data: await res.json() };
 }
 
-export async function offerLogin(data: { username: string; password: string }) {
-  const res = await offerRequest("/offer/login", {
-    method: "POST",
-    body: JSON.stringify(data),
+export async function getOfferHelperHealth() {
+  const res = await fetch(`${OFFER_HELPER_URL}/health`, {
+    method: "GET",
   });
-  const json = await res.json();
-  if (!res.ok) {
-    return {
-      ...json,
-      ok: false,
-      error: json.error || json.message || `HTTP ${res.status}`,
-      detail: json.detail,
-    };
-  }
-  if (json.ok && json.offer_session_id) {
-    setOfferSessionId(json.offer_session_id);
-    setAuthEmail(data.username);
-  }
-  if (json.ok && json.requires_mfa && json.state_token && json.authorize_url) {
-    setAuthEmail(data.username);
-    setOfferMfaChallenge({
-      state_token: json.state_token,
-      authorize_url: json.authorize_url,
-      factors: Array.isArray(json.factors) ? json.factors : [],
-      preferred_factor_id: json.preferred_factor_id ?? null,
-    });
-  }
-  return json;
+  return parseJsonResponse(res, "Local helper health check");
 }
 
-export async function offerVerifyMfa(data: {
-  state_token: string;
-  authorize_url: string;
-  factor_id: string;
-}) {
-  const res = await offerRequest("/offer/verify-mfa", {
+export async function startOfferBrowserSession() {
+  const res = await fetch(`${OFFER_HELPER_URL}/connect`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      origin: window.location.origin,
+    }),
+  });
+  return parseJsonResponse(res, "Local helper connect");
+}
+
+export async function getOfferBrowserSessionStatus(sessionId: string): Promise<OfferHelperSessionStatus> {
+  const res = await fetch(`${OFFER_HELPER_URL}/session/${encodeURIComponent(sessionId)}/status`, {
+    method: "GET",
+  });
+  return parseJsonResponse(res, "Local helper session status");
+}
+
+export async function closeOfferBrowserSession(sessionId: string) {
+  const res = await fetch(`${OFFER_HELPER_URL}/session/${encodeURIComponent(sessionId)}/close`, {
+    method: "POST",
+  });
+  return parseJsonResponse(res, "Local helper session close");
+}
+
+export async function importOfferSession(data: { cookie_header: string; validated_url?: string | null }) {
+  const res = await offerRequest("/offer/import-session", {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -206,7 +210,6 @@ export async function offerVerifyMfa(data: {
   }
   if (json.ok && json.offer_session_id) {
     setOfferSessionId(json.offer_session_id);
-    clearOfferMfaChallenge();
   }
   return json;
 }
@@ -226,6 +229,5 @@ export async function sendOfferPromotion(advert: string, promotion: string) {
 
 export function clearOfferSession() {
   clearOfferSessionId();
-  clearOfferMfaChallenge();
   clearAuthEmail();
 }
