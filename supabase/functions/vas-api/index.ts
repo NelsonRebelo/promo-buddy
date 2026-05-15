@@ -281,6 +281,61 @@ function extractHtmlRedirectUrl(html: string, baseUrl: string): string | null {
   return null;
 }
 
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function extractHtmlFormRedirect(
+  html: string,
+  baseUrl: string,
+): { url: string; method: "GET" | "POST"; body: URLSearchParams } | null {
+  const formMatch = html.match(/<form\b([^>]*)>([\s\S]*?)<\/form>/i);
+  if (!formMatch) return null;
+
+  const [, rawAttrs, formInnerHtml] = formMatch;
+  const actionMatch = rawAttrs.match(/\baction=["']([^"']+)["']/i);
+  const methodMatch = rawAttrs.match(/\bmethod=["']([^"']+)["']/i);
+  const onsubmitAttr = rawAttrs.match(/\bonsubmit=/i);
+  const autoSubmitScript = /document\.forms(?:\[\d+\])?[\s\S]{0,120}\.submit\(\)|\.submit\(\)/i.test(html);
+
+  if (!actionMatch?.[1]) return null;
+  if (!onsubmitAttr && !autoSubmitScript) {
+    const submitButtonMatch = formInnerHtml.match(
+      /<input\b[^>]*type=["']submit["'][^>]*>|<button\b[^>]*type=["']submit["'][^>]*>/i,
+    );
+    if (!submitButtonMatch) return null;
+  }
+
+  let url: string;
+  try {
+    url = new URL(decodeHtmlEntities(actionMatch[1].trim()), baseUrl).toString();
+  } catch {
+    return null;
+  }
+
+  const method = (methodMatch?.[1] || "GET").trim().toUpperCase() === "POST" ? "POST" : "GET";
+  const body = new URLSearchParams();
+  const inputRegex = /<input\b([^>]*)>/gi;
+
+  for (const match of formInnerHtml.matchAll(inputRegex)) {
+    const attrs = match[1];
+    const nameMatch = attrs.match(/\bname=["']([^"']+)["']/i);
+    if (!nameMatch?.[1]) continue;
+    const typeMatch = attrs.match(/\btype=["']([^"']+)["']/i);
+    const inputType = (typeMatch?.[1] || "text").trim().toLowerCase();
+    if (["submit", "button", "image", "file", "reset"].includes(inputType)) continue;
+    const valueMatch = attrs.match(/\bvalue=["']([^"']*)["']/i);
+    body.append(decodeHtmlEntities(nameMatch[1]), decodeHtmlEntities(valueMatch?.[1] || ""));
+  }
+
+  return { url, method, body };
+}
+
 async function followOfferHtmlRedirects(
   initialResponse: Response,
   jar: CookieJar,
@@ -292,21 +347,49 @@ async function followOfferHtmlRedirects(
 
   for (let hop = 0; hop < limit; hop += 1) {
     const nextUrl = extractHtmlRedirectUrl(lastHtml, response.url);
-    if (!nextUrl) break;
-    redirectChain.push(nextUrl);
-    response = await followRedirects(
-      nextUrl,
-      jar,
-      {
-        method: "GET",
-        headers: {
-          "User-Agent": OFFER_BROWSER_USER_AGENT,
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-          Referer: response.url,
+    const formRedirect = nextUrl ? null : extractHtmlFormRedirect(lastHtml, response.url);
+    if (!nextUrl && !formRedirect) break;
+
+    if (nextUrl) {
+      redirectChain.push(nextUrl);
+      response = await followRedirects(
+        nextUrl,
+        jar,
+        {
+          method: "GET",
+          headers: {
+            "User-Agent": OFFER_BROWSER_USER_AGENT,
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            Referer: response.url,
+          },
         },
-      },
-    );
+      );
+    } else if (formRedirect) {
+      const targetUrl = formRedirect.method === "GET"
+        ? `${formRedirect.url}${formRedirect.url.includes("?") ? "&" : "?"}${formRedirect.body.toString()}`
+        : formRedirect.url;
+      redirectChain.push(`${formRedirect.method} ${targetUrl}`);
+      response = await followRedirects(
+        targetUrl,
+        jar,
+        {
+          method: formRedirect.method,
+          headers: {
+            "User-Agent": OFFER_BROWSER_USER_AGENT,
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            Referer: response.url,
+            ...(formRedirect.method === "POST"
+              ? { "Content-Type": "application/x-www-form-urlencoded" }
+              : {}),
+          },
+          ...(formRedirect.method === "POST"
+            ? { body: formRedirect.body.toString() }
+            : {}),
+        },
+      );
+    }
     lastHtml = await response.clone().text().catch(() => "");
   }
 
