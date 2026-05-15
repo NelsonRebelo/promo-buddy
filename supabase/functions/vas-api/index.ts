@@ -602,23 +602,50 @@ async function completeOfferSessionFromSessionToken(
   supabaseAdmin: ReturnType<typeof createClient>,
 ) {
   const userAgent = OFFER_BROWSER_USER_AGENT;
+  const runSessionTokenAttempt = async (
+    initialUrl: string,
+    authPath: string,
+  ) => {
+    const finalResponse = await followRedirects(initialUrl, jar, {
+      method: "GET",
+      headers: {
+        "User-Agent": userAgent,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        Referer: "https://olxgroup.okta-emea.com/",
+      },
+    });
+    const postAuth = await followOfferHtmlRedirects(finalResponse, jar);
+    const enriched = await enrichOfferAdminSession(jar, postAuth.response);
+    const cookieHeader = buildOfferStandvirtualCookieHeader(jar);
+    const finalUrl = enriched.validatedUrl || postAuth.response.url;
+
+    return { postAuth, enriched, cookieHeader, finalUrl, authPath };
+  };
+
   const authorizeWithSession = new URL(authorizeUrl);
   authorizeWithSession.searchParams.set("sessionToken", sessionToken);
+  let attempt = await runSessionTokenAttempt(
+    authorizeWithSession.toString(),
+    "sessionTokenRedirect",
+  );
 
-  const finalResponse = await followRedirects(authorizeWithSession.toString(), jar, {
-    method: "GET",
-    headers: {
-      "User-Agent": userAgent,
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-      Referer: "https://olxgroup.okta-emea.com/",
-    },
-  });
-  const postAuth = await followOfferHtmlRedirects(finalResponse, jar);
+  const certErrorDetected =
+    attempt.postAuth.response.url.includes("/auth/cert/primaryAuth") ||
+    attempt.postAuth.lastHtml.includes("piv.card.error.empty") ||
+    attempt.postAuth.lastHtml.includes("/cert/error");
 
-  const enriched = await enrichOfferAdminSession(jar, postAuth.response);
-  const cookieHeader = buildOfferStandvirtualCookieHeader(jar);
-  const finalUrl = enriched.validatedUrl || postAuth.response.url;
+  if (!attempt.enriched.validated && certErrorDetected) {
+    const sessionCookieRedirect = new URL("https://olxgroup.okta-emea.com/login/sessionCookieRedirect");
+    sessionCookieRedirect.searchParams.set("token", sessionToken);
+    sessionCookieRedirect.searchParams.set("redirectUrl", authorizeUrl);
+    attempt = await runSessionTokenAttempt(
+      sessionCookieRedirect.toString(),
+      "sessionCookieRedirect",
+    );
+  }
+
+  const { postAuth, enriched, cookieHeader, finalUrl, authPath } = attempt;
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
   if (!enriched.validated) {
@@ -637,7 +664,7 @@ async function completeOfferSessionFromSessionToken(
       html_redirect_chain: postAuth.redirectChain,
       post_auth_debug: summarizeHtmlRedirectMechanism(postAuth.lastHtml),
       post_auth_snippet: postAuth.lastHtml.substring(0, 500),
-      auth_path: "sessionTokenRedirect",
+      auth_path: authPath,
     }, 502);
   }
 
@@ -671,6 +698,7 @@ async function completeOfferSessionFromSessionToken(
     params_loaded: enriched.paramsText.length > 0,
     post_auth_url: postAuth.response.url,
     html_redirect_chain: postAuth.redirectChain,
+    auth_path: authPath,
   });
 }
 
