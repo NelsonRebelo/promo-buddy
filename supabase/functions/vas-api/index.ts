@@ -300,16 +300,8 @@ function extractHtmlFormRedirect(
   const [, rawAttrs, formInnerHtml] = formMatch;
   const actionMatch = rawAttrs.match(/\baction=["']([^"']+)["']/i);
   const methodMatch = rawAttrs.match(/\bmethod=["']([^"']+)["']/i);
-  const onsubmitAttr = rawAttrs.match(/\bonsubmit=/i);
-  const autoSubmitScript = /document\.forms(?:\[\d+\])?[\s\S]{0,120}\.submit\(\)|\.submit\(\)/i.test(html);
 
   if (!actionMatch?.[1]) return null;
-  if (!onsubmitAttr && !autoSubmitScript) {
-    const submitButtonMatch = formInnerHtml.match(
-      /<input\b[^>]*type=["']submit["'][^>]*>|<button\b[^>]*type=["']submit["'][^>]*>/i,
-    );
-    if (!submitButtonMatch) return null;
-  }
 
   let url: string;
   try {
@@ -334,6 +326,27 @@ function extractHtmlFormRedirect(
   }
 
   return { url, method, body };
+}
+
+function summarizeHtmlRedirectMechanism(html: string): Record<string, unknown> {
+  const formMatch = html.match(/<form\b([^>]*)>([\s\S]*?)<\/form>/i);
+  const formAction = formMatch?.[1]?.match(/\baction=["']([^"']+)["']/i)?.[1] ?? null;
+  const formMethod = formMatch?.[1]?.match(/\bmethod=["']([^"']+)["']/i)?.[1]?.toUpperCase() ?? null;
+  const inputCount = formMatch
+    ? Array.from(formMatch[2].matchAll(/<input\b/gi)).length
+    : 0;
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+
+  return {
+    has_meta_refresh: /<meta[^>]+http-equiv=["']refresh["']/i.test(html),
+    has_js_location: /window\.location|document\.location|location\.replace|location\.assign/i.test(html),
+    has_form: Boolean(formMatch),
+    form_action: formAction ? decodeHtmlEntities(formAction) : null,
+    form_method: formMethod,
+    form_input_count: inputCount,
+    has_auto_submit_script: /document\.forms(?:\[\d+\])?[\s\S]{0,120}\.submit\(\)|\.submit\(\)/i.test(html),
+    title: titleMatch?.[1]?.replace(/\s+/g, " ").trim() ?? null,
+  };
 }
 
 async function followOfferHtmlRedirects(
@@ -611,6 +624,7 @@ async function completeOfferSessionFromSessionToken(
       params_loaded: enriched.paramsText.length > 0,
       post_auth_url: postAuth.response.url,
       html_redirect_chain: postAuth.redirectChain,
+      post_auth_debug: summarizeHtmlRedirectMechanism(postAuth.lastHtml),
       post_auth_snippet: postAuth.lastHtml.substring(0, 500),
       auth_path: "sessionTokenRedirect",
     }, 502);
@@ -688,6 +702,7 @@ async function completeOfferSessionFromStateToken(
       params_loaded: enriched.paramsText.length > 0,
       post_auth_url: postAuth.response.url,
       html_redirect_chain: postAuth.redirectChain,
+      post_auth_debug: summarizeHtmlRedirectMechanism(postAuth.lastHtml),
       post_auth_snippet: postAuth.lastHtml.substring(0, 500),
       auth_path: "stateTokenRedirect",
     }, 502);
