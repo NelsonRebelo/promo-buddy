@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Loader2, RefreshCcw, ShieldCheck, Unplug } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, CheckCircle2, ExternalLink, Loader2, RefreshCcw, ShieldCheck, Unplug } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -208,10 +208,15 @@ const OfferLogin = () => {
 
       <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
         <div className="relative mx-auto w-full max-w-2xl">
-            <Card className="glass rounded-3xl border-white/80">
+          <Card className="glass rounded-3xl border-white/80">
             <CardHeader className="items-center space-y-4 pb-4 text-center">
               <img src="/olx-group-logo.png" alt="OLX Group" className="h-12 w-auto object-contain" />
-              <CardTitle className="text-3xl font-semibold tracking-tight">Connect Standvirtual</CardTitle>
+              <div className="space-y-2">
+                <CardTitle className="text-3xl font-semibold tracking-tight">Connect Standvirtual</CardTitle>
+                <CardDescription className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  We’ll use a local browser helper so you can complete the real Standvirtual and OKTA login flow in a normal browser window, then import the authenticated session into Promo Buddy.
+                </CardDescription>
+              </div>
             </CardHeader>
             <CardContent className="space-y-5">
               <Alert className="rounded-2xl border-white/80 bg-white/70">
@@ -248,41 +253,58 @@ const OfferLogin = () => {
                 </Alert>
               )}
 
-              <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/75 bg-white/70 p-5">
-                <div className="flex w-full max-w-sm flex-col gap-2">
-                  <Button
-                    type="button"
-                    className="h-11 rounded-xl"
-                    disabled={!canStart || isBusy}
-                    onClick={handleConnect}
-                  >
-                    {isBusy ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {stage === "importing" ? "Importing session..." : "Waiting for browser login..."}
-                      </>
-                    ) : stage === "done" ? (
-                      <>
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Connected
-                      </>
-                    ) : (
-                      "Connect Standvirtual"
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 rounded-xl"
-                    onClick={() => window.open(HELPER_URL, "_blank", "noopener,noreferrer")}
-                  >
-                    Open helper page
-                  </Button>
-                  {isBusy && (
-                    <Button type="button" variant="ghost" className="h-10 rounded-xl" onClick={handleCancelSession}>
-                      Cancel current attempt
+              <div className="grid gap-4 rounded-3xl border border-white/75 bg-white/70 p-5 sm:grid-cols-[1.1fr_0.9fr]">
+                <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+                  <p className="font-medium text-foreground">What will happen</p>
+                  <ol className="space-y-2">
+                    <li>1. Promo Buddy asks the local helper to open a real browser window.</li>
+                    <li>2. You log into Standvirtual there, with the normal OKTA flow.</li>
+                    <li>3. The helper waits for the authenticated admin area, then hands the browser session back to Promo Buddy.</li>
+                    <li>4. Once the session is validated, we open the Offer runner directly.</li>
+                  </ol>
+                </div>
+
+                <div className="flex flex-col justify-between gap-3 rounded-3xl border border-slate-200/80 bg-slate-50/80 p-4">
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">Manual helper page</p>
+                    <p>If you want to inspect the helper directly, you can open its local connect route in a browser.</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-xl"
+                      onClick={() => window.open(HELPER_URL, "_blank", "noopener,noreferrer")}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open helper page
                     </Button>
-                  )}
+                    <Button
+                      type="button"
+                      className="h-11 rounded-xl"
+                      disabled={!canStart || isBusy}
+                      onClick={handleConnect}
+                    >
+                      {isBusy ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {stage === "importing" ? "Importing session..." : "Waiting for browser login..."}
+                        </>
+                      ) : stage === "done" ? (
+                        <>
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Connected
+                        </>
+                      ) : (
+                        "Connect Standvirtual"
+                      )}
+                    </Button>
+                    {isBusy && (
+                      <Button type="button" variant="ghost" className="h-10 rounded-xl" onClick={handleCancelSession}>
+                        Cancel current attempt
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
