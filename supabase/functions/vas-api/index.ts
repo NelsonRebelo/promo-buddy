@@ -289,6 +289,9 @@ function isAuthenticatedAdminHtml(html: string): boolean {
     "/adminpanel/login/logout/",
     "/adminpanel/stats/?formToken=",
     "data-test=\"menu-section-Administration\"",
+    "/adminpanel/usercards/",
+    "ads_display_type",
+    "user_id",
   ];
 
   return markers.some((marker) => html.includes(marker));
@@ -361,6 +364,12 @@ async function enrichOfferAdminSession(
     },
   );
   const paramsText = await paramsRes.text();
+  const paramsLooksAuthenticated =
+    paramsRes.status === 200 &&
+    paramsText.trim().length > 0 &&
+    !paramsRes.url.includes("/adminpanel/login") &&
+    !paramsText.toLowerCase().includes("<html") &&
+    !paramsText.toLowerCase().includes("login");
 
   const usercardsUserId = getCookieValue(buildCookieHeader(jar), "user_id") || "6";
   const usercardsRes = await followRedirects(
@@ -378,7 +387,11 @@ async function enrichOfferAdminSession(
   );
   usercardsStatus = usercardsRes.status;
   usercardsUrl = usercardsRes.url;
-  await usercardsRes.text().catch(() => "");
+  const usercardsHtml = await usercardsRes.text().catch(() => "");
+  const usercardsLooksAuthenticated =
+    usercardsStatus === 200 &&
+    !usercardsUrl.includes("/adminpanel/login") &&
+    !usercardsHtml.toLowerCase().includes("login");
 
   const validationRes = await followRedirects(
     "https://www.standvirtual.com/adminpanel/stats/",
@@ -395,10 +408,19 @@ async function enrichOfferAdminSession(
   );
   validatedUrl = validationRes.url;
   const validationHtml = await validationRes.text();
+  const statsLooksAuthenticated =
+    !validatedUrl.includes("/adminpanel/login") &&
+    isAuthenticatedAdminHtml(statsHtml);
+  const validationLooksAuthenticated = isAuthenticatedAdminHtml(validationHtml);
   const validated =
     validationRes.status === 200 &&
     !validatedUrl.includes("/adminpanel/login") &&
-    isAuthenticatedAdminHtml(validationHtml);
+    (
+      validationLooksAuthenticated ||
+      statsLooksAuthenticated ||
+      paramsLooksAuthenticated ||
+      usercardsLooksAuthenticated
+    );
 
   return {
     statsHtml,
