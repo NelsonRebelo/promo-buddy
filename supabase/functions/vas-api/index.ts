@@ -270,12 +270,8 @@ function extractHtmlRedirectUrl(html: string, baseUrl: string): string | null {
   for (const pattern of patterns) {
     const match = html.match(pattern);
     if (!match?.[1]) continue;
-    const raw = match[1].replace(/&amp;/g, "&").trim();
-    try {
-      return new URL(raw, baseUrl).toString();
-    } catch {
-      continue;
-    }
+    const resolved = resolveHtmlRedirectUrl(match[1], baseUrl);
+    if (resolved) return resolved;
   }
 
   return null;
@@ -286,8 +282,27 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, "\"")
     .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => {
+      const parsed = Number.parseInt(code, 10);
+      return Number.isFinite(parsed) ? String.fromCharCode(parsed) : _;
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+      const parsed = Number.parseInt(code, 16);
+      return Number.isFinite(parsed) ? String.fromCharCode(parsed) : _;
+    })
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
+}
+
+function resolveHtmlRedirectUrl(rawValue: string, baseUrl: string): string | null {
+  const decoded = decodeHtmlEntities(rawValue.trim());
+  const normalized = decoded.replace(/^\/login\/(https?:\/\/)/i, "$1");
+
+  try {
+    return new URL(normalized, baseUrl).toString();
+  } catch {
+    return null;
+  }
 }
 
 function extractHtmlFormRedirect(
@@ -303,12 +318,8 @@ function extractHtmlFormRedirect(
 
   if (!actionMatch?.[1]) return null;
 
-  let url: string;
-  try {
-    url = new URL(decodeHtmlEntities(actionMatch[1].trim()), baseUrl).toString();
-  } catch {
-    return null;
-  }
+  const url = resolveHtmlRedirectUrl(actionMatch[1], baseUrl);
+  if (!url) return null;
 
   const method = (methodMatch?.[1] || "GET").trim().toUpperCase() === "POST" ? "POST" : "GET";
   const body = new URLSearchParams();
