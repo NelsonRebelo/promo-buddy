@@ -401,6 +401,12 @@ function getIdxRemediation(
   ) ?? null;
 }
 
+function getIdxRemediationNames(payload: Record<string, unknown>): string[] {
+  return getIdxRemediations(payload)
+    .map((remediation) => typeof remediation.name === "string" ? remediation.name : null)
+    .filter((name): name is string => Boolean(name));
+}
+
 function buildIdxRemediationPayload(
   schema: unknown,
   provided: Record<string, unknown>,
@@ -1212,7 +1218,10 @@ Deno.serve(async (req) => {
         return json({
           ok: false,
           error: "Okta IDX identify step was not available",
-          detail: JSON.stringify(Object.keys(idxJson)).substring(0, 500),
+          detail: JSON.stringify({
+            keys: Object.keys(idxJson),
+            remediations: getIdxRemediationNames(idxJson),
+          }).substring(0, 500),
         }, 502);
       }
 
@@ -1222,7 +1231,6 @@ Deno.serve(async (req) => {
           jar,
           {
             identifier: username,
-            "credentials.passcode": password,
           },
           authorizeUrl,
         );
@@ -1232,6 +1240,30 @@ Deno.serve(async (req) => {
           error: "Offer authentication failed",
           detail: error instanceof Error ? error.message : String(error),
         }, 401);
+      }
+
+      const passwordRemediation = getIdxRemediation(idxJson, ["challenge-authenticator", "challenge-poll"]);
+      const passwordLikeRemediation = passwordRemediation && JSON.stringify(passwordRemediation).includes("passcode")
+        ? passwordRemediation
+        : getIdxRemediations(idxJson).find((remediation) => JSON.stringify(remediation).includes("passcode")) ?? null;
+
+      if (passwordLikeRemediation) {
+        try {
+          idxJson = await postIdxRemediation(
+            passwordLikeRemediation,
+            jar,
+            {
+              "credentials.passcode": password,
+            },
+            authorizeUrl,
+          );
+        } catch (error) {
+          return json({
+            ok: false,
+            error: "Offer authentication failed",
+            detail: error instanceof Error ? error.message : String(error),
+          }, 401);
+        }
       }
 
       const idxStateHandle = parseIdxStateHandle(idxJson);
