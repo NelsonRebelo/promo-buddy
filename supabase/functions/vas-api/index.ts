@@ -46,6 +46,20 @@ type OfferFactor = {
   verifyHref?: string | null;
 };
 
+const OKTA_IDX_ACCEPT = "application/json; okta-version=1.0.0";
+const OKTA_IDX_ION = "application/ion+json; okta-version=1.0.0";
+const OKTA_USER_AGENT_EXTENDED = "okta-auth-js/7.14.2 okta-signin-widget-7.45.2 okta-hosted";
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function upsertCookies(jar: CookieJar, setCookieHeaders: string[]) {
   for (const header of setCookieHeaders) {
     const [cookiePair] = header.split(";");
@@ -358,6 +372,167 @@ function summarizeHtmlRedirectMechanism(html: string): Record<string, unknown> {
     has_auto_submit_script: /document\.forms(?:\[\d+\])?[\s\S]{0,120}\.submit\(\)|\.submit\(\)/i.test(html),
     title: titleMatch?.[1]?.replace(/\s+/g, " ").trim() ?? null,
   };
+}
+
+function decodeJsHexEscapes(value: string): string {
+  return value
+    .replace(/\\x([0-9a-f]{2})/gi, (_, code) => String.fromCharCode(Number.parseInt(code, 16)))
+    .replace(/\\u([0-9a-f]{4})/gi, (_, code) => String.fromCharCode(Number.parseInt(code, 16)));
+}
+
+function extractOktaPageStateToken(html: string): string | null {
+  const match = html.match(/var\s+stateToken\s*=\s*'([^']+)'/i);
+  if (!match?.[1]) return null;
+  return decodeJsHexEscapes(match[1]);
+}
+
+function getIdxRemediations(payload: Record<string, unknown>): Record<string, unknown>[] {
+  const remediation = asRecord(payload.remediation);
+  return asArray(remediation?.value).map(asRecord).filter(Boolean) as Record<string, unknown>[];
+}
+
+function getIdxRemediation(
+  payload: Record<string, unknown>,
+  names: string[],
+): Record<string, unknown> | null {
+  const wanted = new Set(names);
+  return getIdxRemediations(payload).find((remediation) =>
+    typeof remediation.name === "string" && wanted.has(remediation.name)
+  ) ?? null;
+}
+
+function buildIdxRemediationPayload(
+  schema: unknown,
+  provided: Record<string, unknown>,
+  path = "",
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  for (const field of asArray(schema)) {
+    const entry = asRecord(field);
+    const name = typeof entry?.name === "string" ? entry.name : null;
+    if (!name) continue;
+
+    const fieldPath = path ? `${path}.${name}` : name;
+    const nestedForm = asRecord(entry.form);
+    const providedValue = Object.prototype.hasOwnProperty.call(provided, fieldPath)
+      ? provided[fieldPath]
+      : undefined;
+
+    if (nestedForm?.value) {
+      const nestedPayload = buildIdxRemediationPayload(nestedForm.value, provided, fieldPath);
+      if (Object.keys(nestedPayload).length > 0) {
+        result[name] = nestedPayload;
+      } else if (providedValue && typeof providedValue === "object") {
+        result[name] = providedValue;
+      }
+      continue;
+    }
+
+    if (providedValue !== undefined) {
+      result[name] = providedValue;
+      continue;
+    }
+
+    if (typeof entry.value === "string" || typeof entry.value === "number" || typeof entry.value === "boolean") {
+      result[name] = entry.value;
+    }
+  }
+
+  return result;
+}
+
+async function postIdxJson(
+  url: string,
+  jar: CookieJar,
+  body: Record<string, unknown>,
+  contentType: string,
+  referer: string,
+): Promise<Record<string, unknown>> {
+  const response = await fetchWithJar(url, jar, {
+    method: "POST",
+    headers: {
+      "User-Agent": OFFER_BROWSER_USER_AGENT,
+      Accept: OKTA_IDX_ACCEPT,
+      "Content-Type": contentType,
+      Origin: "https://olxgroup.okta-emea.com",
+      Referer: referer,
+      "X-Okta-User-Agent-Extended": OKTA_USER_AGENT_EXTENDED,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await response.text();
+  let jsonBody: Record<string, unknown> = {};
+  try {
+    jsonBody = text ? JSON.parse(text) : {};
+  } catch {
+    jsonBody = { raw: text };
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof jsonBody.messages === "object" && jsonBody.messages && JSON.stringify(jsonBody.messages)) ||
+      (typeof jsonBody.errorSummary === "string" && jsonBody.errorSummary) ||
+      text.substring(0, 500) ||
+      `Okta IDX request failed: ${response.status}`,
+    );
+  }
+
+  return jsonBody;
+}
+
+async function postIdxRemediation(
+  remediation: Record<string, unknown>,
+  jar: CookieJar,
+  provided: Record<string, unknown>,
+  referer: string,
+): Promise<Record<string, unknown>> {
+  const href = typeof remediation.href === "string" ? remediation.href : null;
+  const method = typeof remediation.method === "string" ? remediation.method.toUpperCase() : "POST";
+  if (!href || method !== "POST") {
+    throw new Error("Okta remediation is missing a POST target.");
+  }
+
+  const payload = buildIdxRemediationPayload(remediation.value, provided);
+  return await postIdxJson(href, jar, payload, "application/json", referer);
+}
+
+function parseIdxStateHandle(payload: Record<string, unknown>): string | null {
+  return typeof payload.stateHandle === "string" ? payload.stateHandle : null;
+}
+
+function parseOfferIdxFactors(payload: Record<string, unknown>): OfferFactor[] {
+  const authenticators = asRecord(payload.authenticators);
+  const values = asArray(authenticators?.value);
+  const factors: OfferFactor[] = [];
+
+  for (const item of values) {
+    const authenticator = asRecord(item);
+    if (!authenticator) continue;
+    const id = typeof authenticator.id === "string" ? authenticator.id : null;
+    if (!id) continue;
+
+    const methods = asArray(authenticator.methods);
+    for (const methodItem of methods) {
+      const method = asRecord(methodItem);
+      const methodType = typeof method?.type === "string" ? method.type : null;
+      if (!methodType) continue;
+      factors.push({
+        id,
+        factorType: methodType,
+        provider: typeof authenticator.key === "string" ? authenticator.key : null,
+        vendorName: typeof authenticator.displayName === "string" ? authenticator.displayName : null,
+        label: typeof authenticator.label === "string"
+          ? authenticator.label
+          : typeof authenticator.displayName === "string"
+            ? authenticator.displayName
+            : null,
+      });
+    }
+  }
+
+  return factors;
 }
 
 async function followOfferHtmlRedirects(
@@ -827,10 +1002,12 @@ function choosePreferredOfferFactor(factors: OfferFactor[]): OfferFactor | null 
     const type = factor.factorType.toLowerCase();
     const provider = (factor.provider || "").toLowerCase();
     const vendor = (factor.vendorName || "").toLowerCase();
-    if (type === "signed_nonce") return 100;
-    if (type === "push" && provider === "okta") return 90;
-    if (type === "push") return 80;
-    if (vendor.includes("fastpass")) return 70;
+    if (type === "push" && provider === "okta_verify") return 100;
+    if (type === "push" && provider === "okta") return 95;
+    if (type === "push") return 90;
+    if (vendor.includes("push")) return 80;
+    if (type === "signed_nonce") return 20;
+    if (vendor.includes("fastpass")) return 10;
     return 0;
   };
 
@@ -904,6 +1081,45 @@ async function pollForOfferSessionToken(
   return { sessionToken: null, detail: "Timed out waiting for MFA approval." };
 }
 
+async function pollForOfferIdxStateToken(
+  stateHandle: string,
+  jar: CookieJar,
+): Promise<{ stateToken: string | null; detail?: string }> {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await sleep(2000);
+
+    const pollJson = await postIdxJson(
+      "https://olxgroup.okta-emea.com/idp/idx/authenticators/poll",
+      jar,
+      {
+        autoChallenge: true,
+        stateHandle,
+      },
+      "application/json",
+      "https://olxgroup.okta-emea.com/",
+    ).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
+
+    if (typeof pollJson.error === "string") {
+      return { stateToken: null, detail: pollJson.error };
+    }
+
+    const returnedStateHandle = parseIdxStateHandle(pollJson) || stateHandle;
+    const remediation = getIdxRemediations(pollJson);
+    const hasPendingChallenge = remediation.some((item) =>
+      typeof item.name === "string" && item.name.includes("challenge")
+    );
+    const hasSuccessRedirect = remediation.some((item) =>
+      typeof item.href === "string" && item.href.includes("/login/token/redirect")
+    );
+
+    if (hasSuccessRedirect || (!hasPendingChallenge && returnedStateHandle !== stateHandle)) {
+      return { stateToken: returnedStateHandle };
+    }
+  }
+
+  return { stateToken: null, detail: "Timed out waiting for MFA approval." };
+}
+
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -955,89 +1171,111 @@ Deno.serve(async (req) => {
           502,
         );
       }
-
-      const authnRes = await fetchWithJar("https://olxgroup.okta-emea.com/api/v1/authn", jar, {
-        method: "POST",
+      const authorizePage = await fetchWithJar(authorizeUrl, jar, {
+        method: "GET",
         headers: {
           "User-Agent": userAgent,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Origin: "https://olxgroup.okta-emea.com",
-          Referer: authorizeUrl,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+          Referer: "https://www.standvirtual.com/adminpanel/login/",
         },
-        body: JSON.stringify({
-          username,
-          password,
-          options: {
-            warnBeforePasswordExpired: true,
-            multiOptionalFactorEnroll: false,
-          },
-        }),
       });
-
-      const authnText = await authnRes.text();
-      let authnJson: Record<string, unknown> = {};
-      try {
-        authnJson = authnText ? JSON.parse(authnText) : {};
-      } catch {
-        authnJson = {};
-      }
-
-      if (!authnRes.ok) {
-        return json(
-          {
-            ok: false,
-            error: `Offer authentication failed: ${authnRes.status}`,
-            detail:
-              (typeof authnJson.errorSummary === "string" && authnJson.errorSummary) ||
-              authnText.substring(0, 500),
-          },
-          401,
-        );
-      }
-
-      const sessionToken = typeof authnJson.sessionToken === "string" ? authnJson.sessionToken : null;
-
-      if (typeof authnJson.status === "string" && authnJson.status === "MFA_REQUIRED") {
-        const factors = parseOfferFactors(authnJson);
-        const preferredFactor = choosePreferredOfferFactor(factors);
-        const pendingExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-        const { data: pendingOfferSession, error: pendingOfferSessionError } = await supabaseAdmin
-          .from("offer_sessions")
-          .insert({
-            cookie_header: buildCookieHeader(jar),
-            expires_at: pendingExpiresAt,
-          })
-          .select("offer_session_id")
-          .single();
-
-        if (pendingOfferSessionError || !pendingOfferSession) {
-          return json({ ok: false, error: "Failed to create pending Offer login session" }, 500);
-        }
-
+      const authorizeHtml = await authorizePage.text();
+      const pageStateToken = extractOktaPageStateToken(authorizeHtml);
+      if (!pageStateToken) {
         return json({
-          ok: true,
-          requires_mfa: true,
-          offer_session_id: pendingOfferSession.offer_session_id,
-          state_token: typeof authnJson.stateToken === "string" ? authnJson.stateToken : null,
-          authorize_url: authorizeUrl,
-          factors,
-          preferred_factor_id: preferredFactor?.id ?? null,
-        });
+          ok: false,
+          error: "Failed to bootstrap Okta IDX login flow",
+          detail: authorizeHtml.substring(0, 500),
+        }, 502);
       }
 
-      if (!sessionToken) {
-        return json(
-          {
-            ok: false,
-            error: "Offer login did not return a session token",
-            detail: authnText.substring(0, 500),
-          },
-          502,
+      let idxJson: Record<string, unknown>;
+      try {
+        idxJson = await postIdxJson(
+          "https://olxgroup.okta-emea.com/idp/idx/introspect",
+          jar,
+          { stateToken: pageStateToken },
+          OKTA_IDX_ION,
+          authorizeUrl,
         );
+      } catch (error) {
+        return json({
+          ok: false,
+          error: "Failed to start Okta IDX login flow",
+          detail: error instanceof Error ? error.message : String(error),
+        }, 502);
       }
 
-      return await completeOfferSessionFromSessionToken(authorizeUrl, sessionToken, jar, supabaseAdmin);
+      const identifyRemediation = getIdxRemediation(idxJson, ["identify", "identify-authenticator"]);
+      if (!identifyRemediation) {
+        return json({
+          ok: false,
+          error: "Okta IDX identify step was not available",
+          detail: JSON.stringify(Object.keys(idxJson)).substring(0, 500),
+        }, 502);
+      }
+
+      try {
+        idxJson = await postIdxRemediation(
+          identifyRemediation,
+          jar,
+          {
+            identifier: username,
+            "credentials.passcode": password,
+          },
+          authorizeUrl,
+        );
+      } catch (error) {
+        return json({
+          ok: false,
+          error: "Offer authentication failed",
+          detail: error instanceof Error ? error.message : String(error),
+        }, 401);
+      }
+
+      const idxStateHandle = parseIdxStateHandle(idxJson);
+      if (!idxStateHandle) {
+        return json({
+          ok: false,
+          error: "Okta IDX did not return a state handle",
+        }, 502);
+      }
+
+      const factors = parseOfferIdxFactors(idxJson);
+      const preferredFactor = choosePreferredOfferFactor(factors);
+      if (!preferredFactor) {
+        const redirected = await completeOfferSessionFromStateToken(
+          idxStateHandle,
+          jar,
+          supabaseAdmin,
+        );
+        return redirected;
+      }
+
+      const pendingExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const { data: pendingOfferSession, error: pendingOfferSessionError } = await supabaseAdmin
+        .from("offer_sessions")
+        .insert({
+          cookie_header: buildCookieHeader(jar),
+          expires_at: pendingExpiresAt,
+        })
+        .select("offer_session_id")
+        .single();
+
+      if (pendingOfferSessionError || !pendingOfferSession) {
+        return json({ ok: false, error: "Failed to create pending Offer login session" }, 500);
+      }
+
+      return json({
+        ok: true,
+        requires_mfa: true,
+        offer_session_id: pendingOfferSession.offer_session_id,
+        state_token: idxStateHandle,
+        authorize_url: authorizeUrl,
+        factors,
+        preferred_factor_id: preferredFactor.id,
+      });
     }
 
     if (path === "/offer/verify-mfa" && req.method === "POST") {
@@ -1061,111 +1299,44 @@ Deno.serve(async (req) => {
       }
 
       const userAgent = OFFER_BROWSER_USER_AGENT;
-
-      const verifyUrl = `https://olxgroup.okta-emea.com/api/v1/authn/factors/${encodeURIComponent(factor_id)}/verify`;
-      const verifyRes = await fetchWithJar(
-        verifyUrl,
-        jar,
-        {
-          method: "POST",
-          headers: {
-            "User-Agent": userAgent,
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Origin: "https://olxgroup.okta-emea.com",
-            Referer: authorize_url,
-          },
-          body: JSON.stringify({
-            stateToken: state_token,
-          }),
-        },
-      );
-
-      const verifyText = await verifyRes.text();
-      let verifyJson: Record<string, unknown> = {};
+      let idxJson: Record<string, unknown>;
       try {
-        verifyJson = verifyText ? JSON.parse(verifyText) : {};
-      } catch {
-        verifyJson = {};
-      }
-
-      if (!verifyRes.ok) {
-        return json(
+        idxJson = await postIdxJson(
+          "https://olxgroup.okta-emea.com/idp/idx/challenge",
+          jar,
           {
-            ok: false,
-            error: `Offer MFA verification failed: ${verifyRes.status}`,
-            detail:
-              (typeof verifyJson.errorSummary === "string" && verifyJson.errorSummary) ||
-              verifyText.substring(0, 500),
+            authenticator: {
+              id: factor_id,
+              methodType: "push",
+            },
+            stateHandle: state_token,
           },
-          401,
+          "application/json",
+          authorize_url,
         );
+      } catch (error) {
+        return json({
+          ok: false,
+          error: "Offer MFA verification failed",
+          detail: error instanceof Error ? error.message : String(error),
+        }, 401);
       }
 
-      const sessionToken =
-        typeof verifyJson.sessionToken === "string" ? verifyJson.sessionToken : null;
-
-      if (!sessionToken) {
-        const polled = await pollForOfferSessionToken(verifyUrl, state_token, jar);
-        if (polled.sessionToken) {
-          const sessionRedirected = await completeOfferSessionFromSessionToken(
-            authorize_url,
-            polled.sessionToken,
-            cloneCookieJar(jar),
-            supabaseAdmin,
-          );
-          const sessionRedirectedBody = await sessionRedirected.clone().json().catch(() => null);
-          if (sessionRedirected.ok && sessionRedirectedBody?.validated) {
-            return sessionRedirected;
-          }
-
-          const stateTokenToUse = polled.stateToken || state_token;
-          const redirected = await completeOfferSessionFromStateToken(
-            stateTokenToUse,
-            cloneCookieJar(jar),
-            supabaseAdmin,
-          );
-
-          const redirectedBody = await redirected.clone().json().catch(() => null);
-          if (redirected.ok && redirectedBody?.validated) {
-            return redirected;
-          }
-
-          return sessionRedirected;
-        }
-
-        return json(
-          {
-            ok: false,
-            error: "MFA approval did not complete successfully",
-            detail: polled.detail || verifyText.substring(0, 500),
-          },
-          502,
-        );
+      const nextStateHandle = parseIdxStateHandle(idxJson) || state_token;
+      const polled = await pollForOfferIdxStateToken(nextStateHandle, jar);
+      if (!polled.stateToken) {
+        return json({
+          ok: false,
+          error: "MFA approval did not complete successfully",
+          detail: polled.detail || JSON.stringify(idxJson).substring(0, 500),
+        }, 502);
       }
 
-      const sessionRedirected = await completeOfferSessionFromSessionToken(
-        authorize_url,
-        sessionToken,
+      return await completeOfferSessionFromStateToken(
+        polled.stateToken,
         cloneCookieJar(jar),
         supabaseAdmin,
       );
-      const sessionRedirectedBody = await sessionRedirected.clone().json().catch(() => null);
-      if (sessionRedirected.ok && sessionRedirectedBody?.validated) {
-        return sessionRedirected;
-      }
-
-      const redirected = await completeOfferSessionFromStateToken(
-        state_token,
-        cloneCookieJar(jar),
-        supabaseAdmin,
-      );
-      const redirectedBody = await redirected.clone().json().catch(() => null);
-      if (redirected.ok && redirectedBody?.validated) {
-        return redirected;
-      }
-
-      return sessionRedirected;
     }
 
     if (path === "/offer/status" && req.method === "GET") {
