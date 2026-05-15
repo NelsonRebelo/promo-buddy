@@ -407,6 +407,37 @@ function getIdxRemediationNames(payload: Record<string, unknown>): string[] {
     .filter((name): name is string => Boolean(name));
 }
 
+function hasIdxDeviceChallengePoll(payload: Record<string, unknown>): boolean {
+  return getIdxRemediationNames(payload).includes("device-challenge-poll");
+}
+
+function getIdxSyntheticPushFactor(payload: Record<string, unknown>): OfferFactor | null {
+  const challenge = asRecord(payload.authenticatorChallenge);
+  const value = asRecord(challenge?.value);
+  const current = asRecord(payload.currentAuthenticatorEnrollment);
+  const currentValue = asRecord(current?.value);
+  const displayName =
+    (typeof value?.displayName === "string" && value.displayName) ||
+    (typeof currentValue?.displayName === "string" && currentValue.displayName) ||
+    "Okta Verify Push";
+  const key =
+    (typeof value?.key === "string" && value.key) ||
+    (typeof currentValue?.key === "string" && currentValue.key) ||
+    "okta_verify";
+
+  if (!hasIdxDeviceChallengePoll(payload) && !challenge) {
+    return null;
+  }
+
+  return {
+    id: "idx-device-challenge",
+    factorType: "push",
+    provider: key,
+    vendorName: displayName,
+    label: displayName,
+  };
+}
+
 function buildIdxRemediationPayload(
   schema: unknown,
   provided: Record<string, unknown>,
@@ -1215,6 +1246,34 @@ Deno.serve(async (req) => {
 
       const identifyRemediation = getIdxRemediation(idxJson, ["identify", "identify-authenticator"]);
       if (!identifyRemediation) {
+        const deviceChallengeFactor = getIdxSyntheticPushFactor(idxJson);
+        const stateHandle = parseIdxStateHandle(idxJson);
+        if (deviceChallengeFactor && stateHandle) {
+          const pendingExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+          const { data: pendingOfferSession, error: pendingOfferSessionError } = await supabaseAdmin
+            .from("offer_sessions")
+            .insert({
+              cookie_header: buildCookieHeader(jar),
+              expires_at: pendingExpiresAt,
+            })
+            .select("offer_session_id")
+            .single();
+
+          if (pendingOfferSessionError || !pendingOfferSession) {
+            return json({ ok: false, error: "Failed to create pending Offer login session" }, 500);
+          }
+
+          return json({
+            ok: true,
+            requires_mfa: true,
+            offer_session_id: pendingOfferSession.offer_session_id,
+            state_token: stateHandle,
+            authorize_url: authorizeUrl,
+            factors: [deviceChallengeFactor],
+            preferred_factor_id: deviceChallengeFactor.id,
+          });
+        }
+
         return json({
           ok: false,
           error: "Okta IDX identify step was not available",
@@ -1331,6 +1390,24 @@ Deno.serve(async (req) => {
       }
 
       const userAgent = OFFER_BROWSER_USER_AGENT;
+
+      if (factor_id === "idx-device-challenge") {
+        const polled = await pollForOfferIdxStateToken(state_token, jar);
+        if (!polled.stateToken) {
+          return json({
+            ok: false,
+            error: "MFA approval did not complete successfully",
+            detail: polled.detail || "Timed out waiting for device challenge approval.",
+          }, 502);
+        }
+
+        return await completeOfferSessionFromStateToken(
+          polled.stateToken,
+          cloneCookieJar(jar),
+          supabaseAdmin,
+        );
+      }
+
       let idxJson: Record<string, unknown>;
       try {
         idxJson = await postIdxJson(
