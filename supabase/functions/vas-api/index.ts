@@ -411,43 +411,11 @@ function hasIdxDeviceChallengePoll(payload: Record<string, unknown>): boolean {
   return getIdxRemediationNames(payload).includes("device-challenge-poll");
 }
 
-function getIdxDeviceChallengeRemediation(payload: Record<string, unknown>): Record<string, unknown> | null {
-  return getIdxRemediation(payload, ["device-challenge-poll"]);
-}
-
-function isIdxLoopbackDeviceChallenge(payload: Record<string, unknown>): boolean {
-  const challenge = asRecord(payload.authenticatorChallenge);
-  const value = asRecord(challenge?.value);
-  const challengeMethod = typeof value?.challengeMethod === "string" ? value.challengeMethod : null;
-  const challengeRequest = typeof value?.challengeRequest === "string" ? value.challengeRequest : null;
-  const verifyUri = typeof value?.verificationUri === "string" ? value.verificationUri : null;
-
-  return (
-    challengeMethod === "LOOPBACK" ||
-    Boolean(challengeRequest?.includes("okta-devicebind+jwt")) ||
-    Boolean(verifyUri?.includes("/idp/authenticators/"))
-  );
-}
-
-function buildOfferLoopbackError(payload: Record<string, unknown>, debug: Record<string, unknown>) {
-  return json({
-    ok: false,
-    error: "Offer login entered a device-bound Okta verification flow",
-    detail:
-      "Okta returned a LOOPBACK/devicebind challenge. This flow is tied to a locally enrolled device and cannot be completed server-side as a phone push request.",
-    debug: {
-      idx: summarizeIdxState(payload),
-      offer_login: debug,
-    },
-  }, 409);
-}
-
 function getIdxSyntheticPushFactor(payload: Record<string, unknown>): OfferFactor | null {
   const challenge = asRecord(payload.authenticatorChallenge);
   const value = asRecord(challenge?.value);
   const current = asRecord(payload.currentAuthenticatorEnrollment);
   const currentValue = asRecord(current?.value);
-  const remediation = getIdxDeviceChallengeRemediation(payload);
   const displayName =
     (typeof value?.displayName === "string" && value.displayName) ||
     (typeof currentValue?.displayName === "string" && currentValue.displayName) ||
@@ -467,7 +435,6 @@ function getIdxSyntheticPushFactor(payload: Record<string, unknown>): OfferFacto
     provider: key,
     vendorName: displayName,
     label: displayName,
-    verifyHref: typeof remediation?.href === "string" ? remediation.href : null,
   };
 }
 
@@ -527,13 +494,6 @@ async function postIdxJson(
       "Content-Type": contentType,
       Origin: "https://olxgroup.okta-emea.com",
       Referer: referer,
-      "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Sec-Fetch-Site": "same-origin",
-      "Sec-Fetch-Mode": "cors",
-      "Sec-Fetch-Dest": "empty",
-      "sec-ch-ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
-      "sec-ch-ua-mobile": "?0",
-      "sec-ch-ua-platform": '"macOS"',
       "X-Okta-User-Agent-Extended": OKTA_USER_AGENT_EXTENDED,
     },
     body: JSON.stringify(body),
@@ -579,22 +539,10 @@ function parseIdxStateHandle(payload: Record<string, unknown>): string | null {
   return typeof payload.stateHandle === "string" ? payload.stateHandle : null;
 }
 
-function pushUniqueOfferFactor(factors: OfferFactor[], factor: OfferFactor | null) {
-  if (!factor?.id || !factor.factorType) return;
-  const exists = factors.some((item) =>
-    item.id === factor.id &&
-    item.factorType === factor.factorType &&
-    (item.provider || "") === (factor.provider || "")
-  );
-  if (!exists) {
-    factors.push(factor);
-  }
-}
-
 function parseOfferIdxFactors(payload: Record<string, unknown>): OfferFactor[] {
-  const factors: OfferFactor[] = [];
   const authenticators = asRecord(payload.authenticators);
   const values = asArray(authenticators?.value);
+  const factors: OfferFactor[] = [];
 
   for (const item of values) {
     const authenticator = asRecord(item);
@@ -607,7 +555,7 @@ function parseOfferIdxFactors(payload: Record<string, unknown>): OfferFactor[] {
       const method = asRecord(methodItem);
       const methodType = typeof method?.type === "string" ? method.type : null;
       if (!methodType) continue;
-      pushUniqueOfferFactor(factors, {
+      factors.push({
         id,
         factorType: methodType,
         provider: typeof authenticator.key === "string" ? authenticator.key : null,
@@ -618,65 +566,6 @@ function parseOfferIdxFactors(payload: Record<string, unknown>): OfferFactor[] {
             ? authenticator.displayName
             : null,
       });
-    }
-  }
-
-  for (const remediation of getIdxRemediations(payload)) {
-    const remediationName = typeof remediation.name === "string" ? remediation.name : "";
-    if (remediationName !== "select-authenticator-authenticate") continue;
-
-    for (const field of asArray(remediation.value)) {
-      const fieldRecord = asRecord(field);
-      if (!fieldRecord || fieldRecord.name !== "authenticator") continue;
-
-      const options = asArray(fieldRecord.options);
-      for (const option of options) {
-        const optionRecord = asRecord(option);
-        if (!optionRecord) continue;
-
-        const relatesTo = asRecord(optionRecord.relatesTo);
-        const relatesToValue = asRecord(relatesTo?.value);
-        const optionValue = asRecord(optionRecord.value);
-        const optionForm = asRecord(optionValue?.form);
-        const optionFormValues = asArray(optionForm?.value);
-
-        let factorId: string | null = null;
-        let methodType: string | null = null;
-
-        for (const formField of optionFormValues) {
-          const formFieldRecord = asRecord(formField);
-          if (!formFieldRecord) continue;
-          if (formFieldRecord.name === "id" && typeof formFieldRecord.value === "string") {
-            factorId = formFieldRecord.value;
-          }
-          if (formFieldRecord.name === "methodType" && typeof formFieldRecord.value === "string") {
-            methodType = formFieldRecord.value;
-          }
-        }
-
-        if (!factorId || !methodType) continue;
-
-        pushUniqueOfferFactor(factors, {
-          id: factorId,
-          factorType: methodType,
-          provider: typeof relatesToValue?.key === "string"
-            ? relatesToValue.key
-            : typeof optionRecord.label === "string" && optionRecord.label.toLowerCase().includes("okta verify")
-              ? "okta_verify"
-              : null,
-          vendorName: typeof relatesToValue?.displayName === "string"
-            ? relatesToValue.displayName
-            : typeof optionRecord.label === "string"
-              ? optionRecord.label
-              : null,
-          label: typeof optionRecord.label === "string"
-            ? optionRecord.label
-            : typeof relatesToValue?.displayName === "string"
-              ? relatesToValue.displayName
-              : null,
-          verifyHref: typeof remediation.href === "string" ? remediation.href : null,
-        });
-      }
     }
   }
 
@@ -1162,62 +1051,6 @@ function choosePreferredOfferFactor(factors: OfferFactor[]): OfferFactor | null 
   return [...factors].sort((a, b) => score(b) - score(a))[0] ?? null;
 }
 
-function summarizeOfferFactors(factors: OfferFactor[]) {
-  return factors.map((factor) => ({
-    id: factor.id,
-    factorType: factor.factorType,
-    provider: factor.provider ?? null,
-    vendorName: factor.vendorName ?? null,
-    label: factor.label ?? null,
-    hasVerifyHref: Boolean(factor.verifyHref),
-  }));
-}
-
-function summarizeIdxState(payload: Record<string, unknown>) {
-  const authChallenge = asRecord(payload.authenticatorChallenge);
-  const authChallengeValue = asRecord(authChallenge?.value);
-  const currentEnrollment = asRecord(payload.currentAuthenticatorEnrollment);
-  const currentEnrollmentValue = asRecord(currentEnrollment?.value);
-  return {
-    keys: Object.keys(payload),
-    remediations: getIdxRemediationNames(payload),
-    hasDeviceChallengePoll: hasIdxDeviceChallengePoll(payload),
-    factors: summarizeOfferFactors(parseOfferIdxFactors(payload)),
-    authenticatorChallenge: authChallengeValue
-      ? {
-          keys: Object.keys(authChallengeValue),
-          contextualDataKeys: Object.keys(asRecord(authChallengeValue.contextualData) ?? {}),
-          challengeDataKeys: Object.keys(asRecord(authChallengeValue.challengeData) ?? {}),
-          pollHref: typeof getIdxDeviceChallengeRemediation(payload)?.href === "string"
-            ? getIdxDeviceChallengeRemediation(payload)?.href
-            : null,
-          raw: JSON.stringify(authChallengeValue).substring(0, 1200),
-        }
-      : null,
-    currentAuthenticatorEnrollment: currentEnrollmentValue
-      ? {
-          keys: Object.keys(currentEnrollmentValue),
-          displayName: typeof currentEnrollmentValue.displayName === "string" ? currentEnrollmentValue.displayName : null,
-          key: typeof currentEnrollmentValue.key === "string" ? currentEnrollmentValue.key : null,
-          raw: JSON.stringify(currentEnrollmentValue).substring(0, 1200),
-        }
-      : null,
-    syntheticFactor: (() => {
-      const factor = getIdxSyntheticPushFactor(payload);
-      return factor
-        ? {
-            id: factor.id,
-            factorType: factor.factorType,
-            provider: factor.provider ?? null,
-            vendorName: factor.vendorName ?? null,
-            label: factor.label ?? null,
-            hasVerifyHref: Boolean(factor.verifyHref),
-          }
-        : null;
-    })(),
-  };
-}
-
 async function pollForOfferSessionToken(
   verifyUrl: string,
   stateToken: string,
@@ -1288,13 +1121,12 @@ async function pollForOfferSessionToken(
 async function pollForOfferIdxStateToken(
   stateHandle: string,
   jar: CookieJar,
-  pollUrl = "https://olxgroup.okta-emea.com/idp/idx/authenticators/poll",
 ): Promise<{ stateToken: string | null; detail?: string }> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await sleep(2000);
 
     const pollJson = await postIdxJson(
-      pollUrl,
+      "https://olxgroup.okta-emea.com/idp/idx/authenticators/poll",
       jar,
       {
         autoChallenge: true,
@@ -1364,8 +1196,8 @@ Deno.serve(async (req) => {
         },
       );
 
-      const rawAuthorizeUrl = oktaEntry.headers.get("location");
-      if (!rawAuthorizeUrl) {
+      const authorizeUrl = oktaEntry.headers.get("location");
+      if (!authorizeUrl) {
         const detail = await oktaEntry.text();
         return json(
           {
@@ -1376,11 +1208,6 @@ Deno.serve(async (req) => {
           502,
         );
       }
-      const authorizeUrlObj = new URL(rawAuthorizeUrl);
-      authorizeUrlObj.searchParams.set("prompt", "login");
-      authorizeUrlObj.searchParams.set("max_age", "0");
-      const authorizeUrl = authorizeUrlObj.toString();
-
       const authorizePage = await fetchWithJar(authorizeUrl, jar, {
         method: "GET",
         headers: {
@@ -1401,12 +1228,6 @@ Deno.serve(async (req) => {
       }
 
       let idxJson: Record<string, unknown>;
-      let offerLoginDebug: Record<string, unknown> = {
-        initial_idx: null,
-        after_bootstrap_poll: null,
-        bootstrap_poll_attempted: false,
-        bootstrap_poll_error: null,
-      };
       try {
         idxJson = await postIdxJson(
           "https://olxgroup.okta-emea.com/idp/idx/introspect",
@@ -1422,82 +1243,9 @@ Deno.serve(async (req) => {
           detail: error instanceof Error ? error.message : String(error),
         }, 502);
       }
-      offerLoginDebug.initial_idx = summarizeIdxState(idxJson);
 
-      let identifyRemediation = getIdxRemediation(idxJson, ["identify", "identify-authenticator"]);
-      if (!identifyRemediation && hasIdxDeviceChallengePoll(idxJson)) {
-        const bootstrapStateHandle = parseIdxStateHandle(idxJson);
-        if (bootstrapStateHandle) {
-          offerLoginDebug.bootstrap_poll_attempted = true;
-          try {
-            idxJson = await postIdxJson(
-              "https://olxgroup.okta-emea.com/idp/idx/authenticators/poll",
-              jar,
-              {
-                stateHandle: bootstrapStateHandle,
-              },
-              "application/json",
-              authorizeUrl,
-            );
-            offerLoginDebug.after_bootstrap_poll = summarizeIdxState(idxJson);
-          } catch {
-            offerLoginDebug.bootstrap_poll_error = "bootstrap poll rejected";
-          }
-          identifyRemediation = getIdxRemediation(idxJson, ["identify", "identify-authenticator"]);
-        }
-      }
-
-      if (identifyRemediation) {
-        try {
-          idxJson = await postIdxRemediation(
-            identifyRemediation,
-            jar,
-            {
-              identifier: username,
-            },
-            authorizeUrl,
-          );
-        } catch (error) {
-          return json({
-            ok: false,
-            error: "Offer authentication failed",
-            detail: error instanceof Error ? error.message : String(error),
-          }, 401);
-        }
-      }
-
-      const findPasswordLikeRemediation = (payload: Record<string, unknown>) => {
-        const passwordRemediation = getIdxRemediation(payload, ["challenge-authenticator", "challenge-poll"]);
-        return passwordRemediation && JSON.stringify(passwordRemediation).includes("passcode")
-          ? passwordRemediation
-          : getIdxRemediations(payload).find((remediation) => JSON.stringify(remediation).includes("passcode")) ?? null;
-      };
-      const passwordLikeRemediation = findPasswordLikeRemediation(idxJson);
-
-      if (passwordLikeRemediation) {
-        try {
-          idxJson = await postIdxRemediation(
-            passwordLikeRemediation,
-            jar,
-            {
-              "credentials.passcode": password,
-            },
-            authorizeUrl,
-          );
-        } catch (error) {
-          return json({
-            ok: false,
-            error: "Offer authentication failed",
-            detail: error instanceof Error ? error.message : String(error),
-          }, 401);
-        }
-      }
-
-      if (!identifyRemediation && !passwordLikeRemediation) {
-        if (isIdxLoopbackDeviceChallenge(idxJson)) {
-          return buildOfferLoopbackError(idxJson, offerLoginDebug);
-        }
-
+      const identifyRemediation = getIdxRemediation(idxJson, ["identify", "identify-authenticator"]);
+      if (!identifyRemediation) {
         const deviceChallengeFactor = getIdxSyntheticPushFactor(idxJson);
         const stateHandle = parseIdxStateHandle(idxJson);
         if (deviceChallengeFactor && stateHandle) {
@@ -1523,26 +1271,58 @@ Deno.serve(async (req) => {
             authorize_url: authorizeUrl,
             factors: [deviceChallengeFactor],
             preferred_factor_id: deviceChallengeFactor.id,
-            debug: {
-              auth_stage: "pre-identify-device-challenge",
-              idx: summarizeIdxState(idxJson),
-              offer_login: offerLoginDebug,
-            },
           });
         }
 
         return json({
           ok: false,
-          error: "Okta IDX identify/password steps were not available",
+          error: "Okta IDX identify step was not available",
           detail: JSON.stringify({
             keys: Object.keys(idxJson),
             remediations: getIdxRemediationNames(idxJson),
           }).substring(0, 500),
-          debug: {
-            idx: summarizeIdxState(idxJson),
-            offer_login: offerLoginDebug,
-          },
         }, 502);
+      }
+
+      try {
+        idxJson = await postIdxRemediation(
+          identifyRemediation,
+          jar,
+          {
+            identifier: username,
+          },
+          authorizeUrl,
+        );
+      } catch (error) {
+        return json({
+          ok: false,
+          error: "Offer authentication failed",
+          detail: error instanceof Error ? error.message : String(error),
+        }, 401);
+      }
+
+      const passwordRemediation = getIdxRemediation(idxJson, ["challenge-authenticator", "challenge-poll"]);
+      const passwordLikeRemediation = passwordRemediation && JSON.stringify(passwordRemediation).includes("passcode")
+        ? passwordRemediation
+        : getIdxRemediations(idxJson).find((remediation) => JSON.stringify(remediation).includes("passcode")) ?? null;
+
+      if (passwordLikeRemediation) {
+        try {
+          idxJson = await postIdxRemediation(
+            passwordLikeRemediation,
+            jar,
+            {
+              "credentials.passcode": password,
+            },
+            authorizeUrl,
+          );
+        } catch (error) {
+          return json({
+            ok: false,
+            error: "Offer authentication failed",
+            detail: error instanceof Error ? error.message : String(error),
+          }, 401);
+        }
       }
 
       const idxStateHandle = parseIdxStateHandle(idxJson);
@@ -1555,42 +1335,6 @@ Deno.serve(async (req) => {
 
       const factors = parseOfferIdxFactors(idxJson);
       const preferredFactor = choosePreferredOfferFactor(factors);
-      const syntheticDeviceChallengeFactor = !preferredFactor ? getIdxSyntheticPushFactor(idxJson) : null;
-      if (!preferredFactor && syntheticDeviceChallengeFactor) {
-        if (isIdxLoopbackDeviceChallenge(idxJson)) {
-          return buildOfferLoopbackError(idxJson, offerLoginDebug);
-        }
-
-        const pendingExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-        const { data: pendingOfferSession, error: pendingOfferSessionError } = await supabaseAdmin
-          .from("offer_sessions")
-          .insert({
-            cookie_header: buildCookieHeader(jar),
-            expires_at: pendingExpiresAt,
-          })
-          .select("offer_session_id")
-          .single();
-
-        if (pendingOfferSessionError || !pendingOfferSession) {
-          return json({ ok: false, error: "Failed to create pending Offer login session" }, 500);
-        }
-
-        return json({
-          ok: true,
-          requires_mfa: true,
-          offer_session_id: pendingOfferSession.offer_session_id,
-          state_token: idxStateHandle,
-          authorize_url: authorizeUrl,
-          factors: [syntheticDeviceChallengeFactor],
-          preferred_factor_id: syntheticDeviceChallengeFactor.id,
-          debug: {
-            auth_stage: "post-password-synthetic-device-challenge",
-            idx: summarizeIdxState(idxJson),
-            offer_login: offerLoginDebug,
-          },
-        });
-      }
-
       if (!preferredFactor) {
         const redirected = await completeOfferSessionFromStateToken(
           idxStateHandle,
@@ -1622,26 +1366,11 @@ Deno.serve(async (req) => {
         authorize_url: authorizeUrl,
         factors,
         preferred_factor_id: preferredFactor.id,
-        debug: {
-          auth_stage: "post-password-factor-selection",
-          idx: summarizeIdxState(idxJson),
-          offer_login: offerLoginDebug,
-          preferred_factor: preferredFactor
-            ? {
-                id: preferredFactor.id,
-                factorType: preferredFactor.factorType,
-                provider: preferredFactor.provider ?? null,
-                vendorName: preferredFactor.vendorName ?? null,
-                label: preferredFactor.label ?? null,
-                hasVerifyHref: Boolean(preferredFactor.verifyHref),
-              }
-            : null,
-        },
       });
     }
 
     if (path === "/offer/verify-mfa" && req.method === "POST") {
-      const { state_token, factor_id, authorize_url, verify_href } = await req.json();
+      const { state_token, factor_id, authorize_url } = await req.json();
       if (!state_token || !factor_id || !authorize_url) {
         return json({ ok: false, error: "Missing MFA verification fields" }, 400);
       }
@@ -1663,54 +1392,12 @@ Deno.serve(async (req) => {
       const userAgent = OFFER_BROWSER_USER_AGENT;
 
       if (factor_id === "idx-device-challenge") {
-        let devicePollUrl = typeof verify_href === "string" && verify_href ? verify_href : undefined;
-        let deviceStateHandle = state_token;
-
-        if (!devicePollUrl) {
-          const bootstrapPoll = await postIdxJson(
-            "https://olxgroup.okta-emea.com/idp/idx/authenticators/poll",
-            jar,
-            {
-              autoChallenge: true,
-              stateHandle: state_token,
-            },
-            "application/json",
-            authorize_url,
-          ).catch((error) => ({
-            error: error instanceof Error ? error.message : String(error),
-          }));
-
-          if (typeof bootstrapPoll.error === "string") {
-            return json({
-              ok: false,
-              error: "MFA approval did not complete successfully",
-              detail: bootstrapPoll.error,
-            }, 502);
-          }
-
-          deviceStateHandle = parseIdxStateHandle(bootstrapPoll) || state_token;
-          const remediation = getIdxDeviceChallengeRemediation(bootstrapPoll);
-          if (typeof remediation?.href === "string" && remediation.href) {
-            devicePollUrl = remediation.href;
-          }
-        }
-
-        const polled = await pollForOfferIdxStateToken(
-          deviceStateHandle,
-          jar,
-          devicePollUrl,
-        );
+        const polled = await pollForOfferIdxStateToken(state_token, jar);
         if (!polled.stateToken) {
           return json({
             ok: false,
             error: "MFA approval did not complete successfully",
             detail: polled.detail || "Timed out waiting for device challenge approval.",
-            debug: {
-              factor_id,
-              verify_href: verify_href ?? null,
-              devicePollUrl: devicePollUrl ?? null,
-              usedSyntheticFactor: true,
-            },
           }, 502);
         }
 
@@ -1751,12 +1438,6 @@ Deno.serve(async (req) => {
           ok: false,
           error: "MFA approval did not complete successfully",
           detail: polled.detail || JSON.stringify(idxJson).substring(0, 500),
-          debug: {
-            factor_id,
-            verify_href: verify_href ?? null,
-            usedSyntheticFactor: false,
-            idx: summarizeIdxState(idxJson),
-          },
         }, 502);
       }
 
@@ -1765,79 +1446,6 @@ Deno.serve(async (req) => {
         cloneCookieJar(jar),
         supabaseAdmin,
       );
-    }
-
-    if (path === "/offer/import-session" && req.method === "POST") {
-      const { cookie_header, validated_url } = await req.json();
-      if (!cookie_header || typeof cookie_header !== "string") {
-        return json({ ok: false, error: "Missing cookie_header" }, 400);
-      }
-
-      const importedJar = cookieHeaderToJar(cookie_header);
-      const sanitizedCookieHeader = buildOfferStandvirtualCookieHeader(importedJar);
-      if (!sanitizedCookieHeader) {
-        return json({
-          ok: false,
-          error: "The imported browser session did not contain usable Standvirtual cookies.",
-        }, 400);
-      }
-
-      const jar = cookieHeaderToJar(sanitizedCookieHeader);
-      const statsResponse = await followRedirects(
-        "https://www.standvirtual.com/adminpanel/stats/",
-        jar,
-        {
-          method: "GET",
-          headers: {
-            "User-Agent": OFFER_BROWSER_USER_AGENT,
-            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            Referer: typeof validated_url === "string" && validated_url
-              ? validated_url
-              : "https://www.standvirtual.com/adminpanel/login/",
-          },
-        },
-      );
-
-      const enriched = await enrichOfferAdminSession(jar, statsResponse);
-      const finalCookieHeader = buildOfferStandvirtualCookieHeader(jar);
-      if (!enriched.validated || !finalCookieHeader) {
-        return json({
-          ok: false,
-          error: "Imported browser session is not authenticated for Standvirtual admin.",
-          final_url: enriched.validatedUrl,
-          cookie_length: finalCookieHeader.length,
-          cookie_names: getCookieNames(finalCookieHeader),
-          usercards_status: enriched.usercardsStatus,
-          usercards_url: enriched.usercardsUrl,
-          stats_contains_admin_markers: isAuthenticatedAdminHtml(enriched.statsHtml),
-          params_loaded: enriched.paramsText.length > 0,
-        }, 401);
-      }
-
-      await supabaseAdmin.rpc("cleanup_expired_offer_sessions");
-      const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
-      const { data: offerSession, error: offerInsertError } = await supabaseAdmin
-        .from("offer_sessions")
-        .insert({
-          cookie_header: finalCookieHeader,
-          expires_at: expiresAt,
-        })
-        .select("offer_session_id, expires_at")
-        .single();
-
-      if (offerInsertError || !offerSession) {
-        return json({ ok: false, error: "Failed to create offer session" }, 500);
-      }
-
-      return json({
-        ok: true,
-        offer_session_id: offerSession.offer_session_id,
-        expires_at: offerSession.expires_at,
-        cookie_length: finalCookieHeader.length,
-        cookie_names: getCookieNames(finalCookieHeader),
-        final_url: enriched.validatedUrl,
-      });
     }
 
     if (path === "/offer/status" && req.method === "GET") {

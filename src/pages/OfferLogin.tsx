@@ -1,51 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, ExternalLink, Loader2, RefreshCcw, ShieldCheck, Unplug } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  closeOfferBrowserSession,
-  getOfferBrowserSessionStatus,
-  getOfferHelperHealth,
-  importOfferSession,
-  startOfferBrowserSession,
-  type OfferHelperSessionStatus,
-} from "@/lib/api";
-
-type HelperHealthState = "checking" | "online" | "offline";
-type ConnectStage = "idle" | "starting" | "waiting" | "importing" | "done" | "failed";
-
-const HELPER_URL = "http://127.0.0.1:43125/connect";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { offerLogin } from "@/lib/api";
 
 const OfferLogin = () => {
   const navigate = useNavigate();
-  const [helperHealth, setHelperHealth] = useState<HelperHealthState>("checking");
-  const [stage, setStage] = useState<ConnectStage>("idle");
+  const [form, setForm] = useState({ username: "", password: "" });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [detail, setDetail] = useState("");
-  const [helperSessionId, setHelperSessionId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState("Checking the local helper...");
-  const [validatedUrl, setValidatedUrl] = useState<string | null>(null);
-  const pollHandle = useRef<number | null>(null);
-
-  const canStart = helperHealth === "online" && (stage === "idle" || stage === "failed");
-
-  const helperHint = useMemo(() => {
-    if (helperHealth === "checking") return "Checking the helper on this machine.";
-    if (helperHealth === "online") return "Local helper detected. We can open a real browser window for Standvirtual login.";
-    return "Local helper not detected. Start it locally, then try again.";
-  }, [helperHealth]);
-
-  const clearPolling = () => {
-    if (pollHandle.current !== null) {
-      window.clearTimeout(pollHandle.current);
-      pollHandle.current = null;
-    }
-  };
 
   const handleBack = () => {
-    clearPolling();
     if (window.history.length > 1) {
       navigate(-1);
       return;
@@ -53,134 +22,27 @@ const OfferLogin = () => {
     navigate("/", { replace: true });
   };
 
-  const checkHelper = async () => {
-    setHelperHealth("checking");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
+    setLoading(true);
     try {
-      const res = await getOfferHelperHealth();
-      setHelperHealth(res?.ok ? "online" : "offline");
-    } catch {
-      setHelperHealth("offline");
-    }
-  };
-
-  useEffect(() => {
-    checkHelper();
-    return () => {
-      clearPolling();
-    };
-  }, []);
-
-  const finishImport = async (cookieHeader: string, helperValidatedUrl?: string | null) => {
-    setStage("importing");
-    setStatusMessage("Importing the authenticated browser session into Promo Buddy...");
-    setValidatedUrl(helperValidatedUrl ?? null);
-    const result = await importOfferSession({
-      cookie_header: cookieHeader,
-      validated_url: helperValidatedUrl ?? null,
-    });
-
-    if (!result.ok) {
-      setStage("failed");
-      setError(result.detail || result.error || "Failed to import the authenticated Offer session.");
-      return;
-    }
-
-    if (helperSessionId) {
-      try {
-        await closeOfferBrowserSession(helperSessionId);
-      } catch {
-        // Best-effort cleanup only.
+      const res = await offerLogin(form);
+      if (res.ok) {
+        if (res.requires_mfa) {
+          navigate("/offer-mfa", { replace: true });
+          return;
+        }
+        navigate("/offer-runner", { replace: true });
+      } else {
+        setError(res.detail || res.error || "Offer promotion login failed.");
       }
-    }
-
-    setStage("done");
-    setStatusMessage("Standvirtual is connected. Opening the Offer runner...");
-    setTimeout(() => {
-      navigate("/offer-runner", { replace: true });
-    }, 450);
-  };
-
-  const pollStatus = async (sessionId: string) => {
-    try {
-      const res = await getOfferBrowserSessionStatus(sessionId);
-      const status = res as OfferHelperSessionStatus;
-
-      if (!status.ok) {
-        setStage("failed");
-        setError(status.error || "The local helper session failed.");
-        if (status.detail) setDetail(status.detail);
-        return;
-      }
-
-      if (status.status === "authenticated") {
-        await finishImport(status.cookie_header, status.validated_url);
-        return;
-      }
-
-      if (status.status === "waiting_for_login") {
-        setStage("waiting");
-        setStatusMessage(status.message || "The browser is open. Finish the normal Standvirtual login flow there.");
-      }
-
-      if (status.status === "starting") {
-        setStage("starting");
-        setStatusMessage(status.message || "Opening the browser window...");
-      }
-
-      pollHandle.current = window.setTimeout(() => {
-        void pollStatus(sessionId);
-      }, 1800);
     } catch (err) {
-      setStage("failed");
-      setError(err instanceof Error ? err.message : "Failed to poll the local helper status.");
+      setError(err instanceof Error ? err.message : "Unexpected error");
+    } finally {
+      setLoading(false);
     }
   };
-
-  const handleConnect = async () => {
-    setError("");
-    setDetail("");
-    setValidatedUrl(null);
-    setStage("starting");
-    setStatusMessage("Opening the local browser helper...");
-
-    try {
-      const res = await startOfferBrowserSession();
-      if (!res?.ok || !res?.session_id) {
-        setStage("failed");
-        setError(res?.error || "Failed to start the local browser helper.");
-        return;
-      }
-
-      setHelperSessionId(res.session_id);
-      setStatusMessage("Browser window opened. Continue the login flow there.");
-      await pollStatus(res.session_id);
-    } catch (err) {
-      setStage("failed");
-      setError(err instanceof Error ? err.message : "Failed to start the local browser helper.");
-    }
-  };
-
-  const handleCancelSession = async () => {
-    clearPolling();
-    if (helperSessionId) {
-      try {
-        await closeOfferBrowserSession(helperSessionId);
-      } catch {
-        // Best-effort cleanup only.
-      }
-    }
-    setHelperSessionId(null);
-    setStage("idle");
-    setStatusMessage(helperHealth === "online"
-      ? "Local helper detected. We can open a real browser window for Standvirtual login."
-      : "Checking the local helper...");
-    setError("");
-    setDetail("");
-    setValidatedUrl(null);
-  };
-
-  const isBusy = stage === "starting" || stage === "waiting" || stage === "importing";
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -207,106 +69,57 @@ const OfferLogin = () => {
       </header>
 
       <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
-        <div className="relative mx-auto w-full max-w-2xl">
+        <div className="relative mx-auto w-full max-w-md">
           <Card className="glass rounded-3xl border-white/80">
-            <CardHeader className="items-center space-y-4 pb-4 text-center">
+            <CardHeader className="items-center space-y-4 pb-2 text-center">
               <img src="/olx-group-logo.png" alt="OLX Group" className="h-12 w-auto object-contain" />
-              <div className="space-y-2">
-                <CardTitle className="text-3xl font-semibold tracking-tight">Connect Standvirtual</CardTitle>
-                <CardDescription className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-                  We’ll use a local browser helper so you can complete the real Standvirtual and OKTA login flow in a normal browser window, then import the authenticated session into Promo Buddy.
-                </CardDescription>
-              </div>
+              <CardDescription className="text-sm leading-relaxed text-muted-foreground">
+                Login with your OKTA credentials
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <Alert className="rounded-2xl border-white/80 bg-white/70">
-                <ShieldCheck className="h-4 w-4" />
-                <AlertTitle>Helper status</AlertTitle>
-                <AlertDescription className="flex flex-col gap-2 text-sm leading-relaxed">
-                  <span>{helperHint}</span>
-                  <span className="font-medium text-foreground">{statusMessage}</span>
-                  {validatedUrl && <span className="text-xs text-muted-foreground">Validated on: {validatedUrl}</span>}
-                </AlertDescription>
-              </Alert>
-
-              {error && (
-                <Alert variant="destructive" className="rounded-2xl">
-                  <AlertTitle>Could not connect</AlertTitle>
-                  <AlertDescription className="space-y-2">
-                    <p>{error}</p>
-                    {detail && <p className="text-xs opacity-90">{detail}</p>}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {helperHealth === "offline" && (
-                <Alert className="rounded-2xl border-amber-200 bg-amber-50/90 text-amber-950">
-                  <Unplug className="h-4 w-4" />
-                  <AlertTitle>Helper not running</AlertTitle>
-                  <AlertDescription className="space-y-2 text-sm">
-                    <p>Start the local browser helper on this machine, then come back and retry the check.</p>
-                    <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={checkHelper}>
-                      <RefreshCcw className="mr-2 h-4 w-4" />
-                      Check again
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <div className="grid gap-4 rounded-3xl border border-white/75 bg-white/70 p-5 sm:grid-cols-[1.1fr_0.9fr]">
-                <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
-                  <p className="font-medium text-foreground">What will happen</p>
-                  <ol className="space-y-2">
-                    <li>1. Promo Buddy asks the local helper to open a real browser window.</li>
-                    <li>2. You log into Standvirtual there, with the normal OKTA flow.</li>
-                    <li>3. The helper waits for the authenticated admin area, then hands the browser session back to Promo Buddy.</li>
-                    <li>4. Once the session is validated, we open the Offer runner directly.</li>
-                  </ol>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive" className="rounded-2xl">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="offer-username" className="text-sm font-medium">
+                    Username
+                  </Label>
+                  <Input
+                    id="offer-username"
+                    value={form.username}
+                    onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))}
+                    className="h-11 rounded-xl bg-white/70"
+                    required
+                  />
                 </div>
-
-                <div className="flex flex-col justify-between gap-3 rounded-3xl border border-slate-200/80 bg-slate-50/80 p-4">
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <p className="font-medium text-foreground">Manual helper page</p>
-                    <p>If you want to inspect the helper directly, you can open its local connect route in a browser.</p>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11 rounded-xl"
-                      onClick={() => window.open(HELPER_URL, "_blank", "noopener,noreferrer")}
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Open helper page
-                    </Button>
-                    <Button
-                      type="button"
-                      className="h-11 rounded-xl"
-                      disabled={!canStart || isBusy}
-                      onClick={handleConnect}
-                    >
-                      {isBusy ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {stage === "importing" ? "Importing session..." : "Waiting for browser login..."}
-                        </>
-                      ) : stage === "done" ? (
-                        <>
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Connected
-                        </>
-                      ) : (
-                        "Connect Standvirtual"
-                      )}
-                    </Button>
-                    {isBusy && (
-                      <Button type="button" variant="ghost" className="h-10 rounded-xl" onClick={handleCancelSession}>
-                        Cancel current attempt
-                      </Button>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="offer-password" className="text-sm font-medium">
+                    Password
+                  </Label>
+                  <Input
+                    id="offer-password"
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))}
+                    className="h-11 rounded-xl bg-white/70"
+                    required
+                  />
                 </div>
-              </div>
+                <Button type="submit" className="h-11 w-full rounded-xl text-sm font-medium" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing login...
+                    </>
+                  ) : (
+                    "Continue"
+                  )}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </div>
