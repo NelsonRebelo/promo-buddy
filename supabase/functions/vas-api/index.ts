@@ -1214,7 +1214,12 @@ Deno.serve(async (req) => {
           502,
         );
       }
-      const authorizePage = await fetchWithJar(authorizeUrl, jar, {
+      const authorizeFlowUrl = new URL(authorizeUrl);
+      authorizeFlowUrl.searchParams.set("prompt", "login");
+      authorizeFlowUrl.searchParams.set("max_age", "0");
+      const authorizeFlowUrlString = authorizeFlowUrl.toString();
+
+      const authorizePage = await fetchWithJar(authorizeFlowUrlString, jar, {
         method: "GET",
         headers: {
           "User-Agent": userAgent,
@@ -1240,7 +1245,7 @@ Deno.serve(async (req) => {
           jar,
           { stateToken: pageStateToken },
           OKTA_IDX_ION,
-          authorizeUrl,
+          authorizeFlowUrlString,
         );
       } catch (error) {
         return json({
@@ -1274,7 +1279,7 @@ Deno.serve(async (req) => {
             requires_mfa: true,
             offer_session_id: pendingOfferSession.offer_session_id,
             state_token: stateHandle,
-            authorize_url: authorizeUrl,
+            authorize_url: authorizeFlowUrlString,
             factors: [deviceChallengeFactor],
             preferred_factor_id: deviceChallengeFactor.id,
           });
@@ -1297,7 +1302,7 @@ Deno.serve(async (req) => {
           {
             identifier: username,
           },
-          authorizeUrl,
+          authorizeFlowUrlString,
         );
       } catch (error) {
         return json({
@@ -1320,7 +1325,7 @@ Deno.serve(async (req) => {
             {
               "credentials.passcode": password,
             },
-            authorizeUrl,
+            authorizeFlowUrlString,
           );
         } catch (error) {
           return json({
@@ -1369,7 +1374,7 @@ Deno.serve(async (req) => {
         requires_mfa: true,
         offer_session_id: pendingOfferSession.offer_session_id,
         state_token: idxStateHandle,
-        authorize_url: authorizeUrl,
+        authorize_url: authorizeFlowUrlString,
         factors,
         preferred_factor_id: preferredFactor.id,
       });
@@ -1396,8 +1401,21 @@ Deno.serve(async (req) => {
       }
 
       const userAgent = OFFER_BROWSER_USER_AGENT;
+      const chosenMethodType = typeof factor_type === "string" && factor_type.trim().length > 0
+        ? factor_type.toLowerCase()
+        : "push";
+      const expectsPasscode = isPasscodeFactorType(chosenMethodType);
+      if (expectsPasscode && (!passcode || String(passcode).trim().length === 0)) {
+        return json({ ok: false, error: "MFA code is required for this method." }, 400);
+      }
+      if (expectsPasscode && factor_id === "idx-device-challenge") {
+        return json({
+          ok: false,
+          error: "Code MFA is not available for this challenge. Please start login again.",
+        }, 409);
+      }
 
-      if (factor_id === "idx-device-challenge") {
+      if (factor_id === "idx-device-challenge" && !expectsPasscode) {
         const polled = await pollForOfferIdxStateToken(state_token, jar);
         if (!polled.stateToken) {
           return json({
@@ -1415,14 +1433,6 @@ Deno.serve(async (req) => {
       }
 
       let idxJson: Record<string, unknown>;
-      const chosenMethodType = typeof factor_type === "string" && factor_type.trim().length > 0
-        ? factor_type.toLowerCase()
-        : "push";
-      const expectsPasscode = isPasscodeFactorType(chosenMethodType);
-      if (expectsPasscode && (!passcode || String(passcode).trim().length === 0)) {
-        return json({ ok: false, error: "MFA code is required for this method." }, 400);
-      }
-
       try {
         idxJson = await postIdxJson(
           "https://olxgroup.okta-emea.com/idp/idx/challenge",
@@ -1438,10 +1448,18 @@ Deno.serve(async (req) => {
           authorize_url,
         );
       } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        if (detail.includes("Expected: IDENTIFY")) {
+          return json({
+            ok: false,
+            error: "MFA state became invalid. Please start login again.",
+            detail,
+          }, 409);
+        }
         return json({
           ok: false,
           error: "Offer MFA verification failed",
-          detail: error instanceof Error ? error.message : String(error),
+          detail,
         }, 401);
       }
 

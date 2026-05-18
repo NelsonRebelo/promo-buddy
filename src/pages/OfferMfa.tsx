@@ -40,6 +40,11 @@ const OfferMfa = () => {
     challenge?.factors?.[0] ??
     null;
   const useCodeFlow = true;
+  const codeFactor = challenge?.factors?.find((factor) => {
+    const t = (factor.factorType || "").toLowerCase();
+    return t === "totp" || t === "otp" || t === "token:software:totp";
+  }) ?? null;
+  const effectiveFactor = useCodeFlow ? codeFactor : selectedFactor;
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -50,7 +55,7 @@ const OfferMfa = () => {
   };
 
   const runVerification = async () => {
-    if (!challenge || !selectedFactor) {
+    if (!challenge || !effectiveFactor) {
       setError("No MFA challenge is available. Start the Offer Promotion login again.");
       return;
     }
@@ -67,8 +72,8 @@ const OfferMfa = () => {
       const res = await offerVerifyMfa({
         state_token: challenge.state_token,
         authorize_url: challenge.authorize_url,
-        factor_id: selectedFactor.id,
-        factor_type: useCodeFlow ? "totp" : selectedFactor.factorType,
+        factor_id: effectiveFactor.id,
+        factor_type: useCodeFlow ? effectiveFactor.factorType : selectedFactor?.factorType,
         passcode: useCodeFlow ? mfaCode.trim() : undefined,
       });
       if (res.ok) {
@@ -145,6 +150,13 @@ const OfferMfa = () => {
                     </pre>
                   </div>
                 )}
+                {useCodeFlow && !effectiveFactor && (
+                  <Alert variant="destructive" className="rounded-2xl">
+                    <AlertDescription>
+                      This login attempt did not return a code-based MFA method. Start again to retry.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {useCodeFlow && (
                   <div className="space-y-2">
                     <Input
@@ -173,7 +185,7 @@ const OfferMfa = () => {
                   <Button
                     type="button"
                     className="h-11 flex-1 rounded-xl text-sm font-medium"
-                    disabled={loading || !challenge || !selectedFactor || (useCodeFlow && mfaCode.trim().length === 0)}
+                    disabled={loading || !challenge || !effectiveFactor || (useCodeFlow && mfaCode.trim().length === 0)}
                     onClick={runVerification}
                   >
                     {loading ? (
