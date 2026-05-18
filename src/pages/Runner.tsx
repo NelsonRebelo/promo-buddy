@@ -791,7 +791,7 @@ const Runner = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] border border-white/80 bg-white/95 p-6 shadow-2xl">
             <p className="text-center text-base leading-7 text-slate-800">
-              These VAS will be <strong>NOT BE FREE</strong> to the seller. Are you sure?
+              These VAS will <strong>NOT BE FREE</strong>. Are you sure?
             </p>
             <div className="mt-6 flex justify-center gap-3">
               <Button

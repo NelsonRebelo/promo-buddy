@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import { clearOfferMfaChallenge, getOfferMfaChallenge, offerVerifyMfa } from "@/lib/api";
 
 const formatOfferDiagnostics = (response: Record<string, unknown>) => {
@@ -32,11 +33,13 @@ const OfferMfa = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [diagnostics, setDiagnostics] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
 
   const selectedFactor =
     challenge?.factors?.find((factor) => factor.id === challenge.preferred_factor_id) ??
     challenge?.factors?.[0] ??
     null;
+  const useCodeFlow = true;
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -52,6 +55,11 @@ const OfferMfa = () => {
       return;
     }
 
+    if (useCodeFlow && mfaCode.trim().length === 0) {
+      setError("Enter the MFA code from Okta Verify.");
+      return;
+    }
+
     setError("");
     setDiagnostics("");
     setLoading(true);
@@ -60,6 +68,8 @@ const OfferMfa = () => {
         state_token: challenge.state_token,
         authorize_url: challenge.authorize_url,
         factor_id: selectedFactor.id,
+        factor_type: useCodeFlow ? "totp" : selectedFactor.factorType,
+        passcode: useCodeFlow ? mfaCode.trim() : undefined,
       });
       if (res.ok) {
         navigate("/offer-runner", { replace: true });
@@ -76,9 +86,8 @@ const OfferMfa = () => {
 
   useEffect(() => {
     if (!challenge || !selectedFactor) return;
-    runVerification();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [useCodeFlow]);
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -113,7 +122,7 @@ const OfferMfa = () => {
               </div>
               <CardTitle className="text-2xl font-semibold tracking-tight">Verify MFA</CardTitle>
               <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-                Approve the push notification request on your device.
+                Enter your Okta Verify code to continue.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -136,6 +145,19 @@ const OfferMfa = () => {
                     </pre>
                   </div>
                 )}
+                {useCodeFlow && (
+                  <div className="space-y-2">
+                    <Input
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={8}
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                      placeholder="Enter MFA code"
+                      className="h-11 rounded-xl bg-white/70 text-center tracking-[0.2em]"
+                    />
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <Button
                     type="button"
@@ -151,7 +173,7 @@ const OfferMfa = () => {
                   <Button
                     type="button"
                     className="h-11 flex-1 rounded-xl text-sm font-medium"
-                    disabled={loading || !challenge || !selectedFactor}
+                    disabled={loading || !challenge || !selectedFactor || (useCodeFlow && mfaCode.trim().length === 0)}
                     onClick={runVerification}
                   >
                     {loading ? (
@@ -160,7 +182,7 @@ const OfferMfa = () => {
                         Waiting...
                       </>
                     ) : (
-                      "Try approval again"
+                      useCodeFlow ? "Verify code" : "Try approval again"
                     )}
                   </Button>
                 </div>

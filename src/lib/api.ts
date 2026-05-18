@@ -190,6 +190,8 @@ export async function offerVerifyMfa(data: {
   state_token: string;
   authorize_url: string;
   factor_id: string;
+  factor_type?: string;
+  passcode?: string;
 }) {
   const res = await offerRequest("/offer/verify-mfa", {
     method: "POST",

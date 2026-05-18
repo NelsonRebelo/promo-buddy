@@ -1039,6 +1039,7 @@ function choosePreferredOfferFactor(factors: OfferFactor[]): OfferFactor | null 
     const type = factor.factorType.toLowerCase();
     const provider = (factor.provider || "").toLowerCase();
     const vendor = (factor.vendorName || "").toLowerCase();
+    if (type === "totp" || type === "otp" || type === "token:software:totp") return 120;
     if (type === "push" && provider === "okta_verify") return 100;
     if (type === "push" && provider === "okta") return 95;
     if (type === "push") return 90;
@@ -1049,6 +1050,11 @@ function choosePreferredOfferFactor(factors: OfferFactor[]): OfferFactor | null 
   };
 
   return [...factors].sort((a, b) => score(b) - score(a))[0] ?? null;
+}
+
+function isPasscodeFactorType(factorType: string): boolean {
+  const t = factorType.toLowerCase();
+  return t === "totp" || t === "otp" || t === "token:software:totp";
 }
 
 async function pollForOfferSessionToken(
@@ -1370,7 +1376,7 @@ Deno.serve(async (req) => {
     }
 
     if (path === "/offer/verify-mfa" && req.method === "POST") {
-      const { state_token, factor_id, authorize_url } = await req.json();
+      const { state_token, factor_id, authorize_url, factor_type, passcode } = await req.json();
       if (!state_token || !factor_id || !authorize_url) {
         return json({ ok: false, error: "Missing MFA verification fields" }, 400);
       }
@@ -1409,6 +1415,14 @@ Deno.serve(async (req) => {
       }
 
       let idxJson: Record<string, unknown>;
+      const chosenMethodType = typeof factor_type === "string" && factor_type.trim().length > 0
+        ? factor_type.toLowerCase()
+        : "push";
+      const expectsPasscode = isPasscodeFactorType(chosenMethodType);
+      if (expectsPasscode && (!passcode || String(passcode).trim().length === 0)) {
+        return json({ ok: false, error: "MFA code is required for this method." }, 400);
+      }
+
       try {
         idxJson = await postIdxJson(
           "https://olxgroup.okta-emea.com/idp/idx/challenge",
@@ -1416,7 +1430,7 @@ Deno.serve(async (req) => {
           {
             authenticator: {
               id: factor_id,
-              methodType: "push",
+              methodType: chosenMethodType,
             },
             stateHandle: state_token,
           },
@@ -1429,6 +1443,48 @@ Deno.serve(async (req) => {
           error: "Offer MFA verification failed",
           detail: error instanceof Error ? error.message : String(error),
         }, 401);
+      }
+
+      if (expectsPasscode) {
+        const codeRemediation =
+          getIdxRemediation(idxJson, ["challenge-authenticator", "challenge-poll"]) ??
+          getIdxRemediations(idxJson).find((remediation) => JSON.stringify(remediation).includes("passcode")) ??
+          null;
+
+        if (!codeRemediation) {
+          return json({
+            ok: false,
+            error: "MFA code challenge was not returned by Okta",
+            detail: JSON.stringify({
+              remediations: getIdxRemediationNames(idxJson),
+              keys: Object.keys(idxJson),
+            }).substring(0, 500),
+          }, 502);
+        }
+
+        try {
+          idxJson = await postIdxRemediation(
+            codeRemediation,
+            jar,
+            {
+              "credentials.passcode": String(passcode).trim(),
+            },
+            authorize_url,
+          );
+        } catch (error) {
+          return json({
+            ok: false,
+            error: "MFA code verification failed",
+            detail: error instanceof Error ? error.message : String(error),
+          }, 401);
+        }
+
+        const codeStateHandle = parseIdxStateHandle(idxJson) || state_token;
+        return await completeOfferSessionFromStateToken(
+          codeStateHandle,
+          cloneCookieJar(jar),
+          supabaseAdmin,
+        );
       }
 
       const nextStateHandle = parseIdxStateHandle(idxJson) || state_token;
