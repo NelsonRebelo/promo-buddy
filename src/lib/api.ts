@@ -186,6 +186,27 @@ export async function offerLogin(data: { username: string; password: string }) {
   return json;
 }
 
+export async function offerLoginWithCookie(data: { cookie: string }) {
+  const res = await offerRequest("/offer/manual-cookie", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    return {
+      ...json,
+      ok: false,
+      error: json.error || json.message || `HTTP ${res.status}`,
+      detail: json.detail,
+    };
+  }
+  if (json.ok && json.offer_session_id) {
+    setOfferSessionId(json.offer_session_id);
+    clearOfferMfaChallenge();
+  }
+  return json;
+}
+
 export async function offerVerifyMfa(data: {
   state_token: string;
   authorize_url: string;

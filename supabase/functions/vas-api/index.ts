@@ -224,6 +224,34 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function validateOfferAdminCookie(cookieHeader: string): Promise<{ ok: boolean; finalUrl: string; status: number }> {
+  const response = await fetch("https://www.standvirtual.com/adminpanel/stats/", {
+    method: "GET",
+    headers: {
+      accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "accept-language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      "cache-control": "no-cache",
+      pragma: "no-cache",
+      "user-agent": OFFER_BROWSER_USER_AGENT,
+      Cookie: cookieHeader,
+    },
+    redirect: "follow",
+  });
+
+  const finalUrl = response.url || "";
+  const lowerUrl = finalUrl.toLowerCase();
+  const redirectedToLogin =
+    lowerUrl.includes("/adminpanel/login") ||
+    lowerUrl.includes("olxgroup.okta-emea.com");
+
+  return {
+    ok: response.ok && !redirectedToLogin,
+    finalUrl,
+    status: response.status,
+  };
+}
+
 async function fetchWithJar(
   input: string,
   jar: CookieJar,
@@ -273,6 +301,18 @@ async function followRedirects(
 }
 
 function extractHtmlRedirectUrl(html: string, baseUrl: string): string | null {
+  const concatenatedJsRedirect = html.match(
+    /(?:window\.)?location\.replace\(\s*((?:(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*')\s*(?:\+\s*)?)*)\s*\)/i,
+  )?.[1];
+  if (concatenatedJsRedirect) {
+    const parts = [...concatenatedJsRedirect.matchAll(/"(?:\\.|[^"])*"|'(?:\\.|[^'])*'/g)]
+      .map((match) => decodeJsStringLiteral(match[0]));
+    if (parts.length > 0) {
+      const resolved = resolveHtmlRedirectUrl(parts.join(""), baseUrl);
+      if (resolved) return resolved;
+    }
+  }
+
   const patterns = [
     /<meta[^>]+http-equiv=["']refresh["'][^>]+content=["'][^"']*url=([^"']+)["']/i,
     /window\.location(?:\.href)?\s*=\s*["']([^"']+)["']/i,
@@ -306,6 +346,18 @@ function decodeHtmlEntities(value: string): string {
     })
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
+}
+
+function decodeJsStringLiteral(literal: string): string {
+  const quote = literal[0];
+  const raw = literal.endsWith(quote) ? literal.slice(1, -1) : literal;
+  return raw
+    .replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/\\\//g, "/")
+    .replace(/\\"/g, "\"")
+    .replace(/\\'/g, "'")
+    .replace(/\\\\/g, "\\");
 }
 
 function resolveHtmlRedirectUrl(rawValue: string, baseUrl: string): string | null {
@@ -535,8 +587,54 @@ async function postIdxRemediation(
   return await postIdxJson(href, jar, payload, "application/json", referer);
 }
 
+function findIdxStateHandleDeep(value: unknown, depth = 0): string | null {
+  if (depth > 8) return null;
+  if (typeof value === "string") {
+    return value.startsWith("02.id.") ? value : null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findIdxStateHandleDeep(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!value || typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.stateHandle === "string" && record.stateHandle.startsWith("02.id.")) {
+    return record.stateHandle;
+  }
+
+  for (const nested of Object.values(record)) {
+    const found = findIdxStateHandleDeep(nested, depth + 1);
+    if (found) return found;
+  }
+
+  return null;
+}
+
 function parseIdxStateHandle(payload: Record<string, unknown>): string | null {
-  return typeof payload.stateHandle === "string" ? payload.stateHandle : null;
+  const deep = findIdxStateHandleDeep(payload);
+  if (deep) return deep;
+  if (typeof payload.stateHandle === "string") return payload.stateHandle;
+  return null;
+}
+
+function getIdxCompletionUrl(payload: Record<string, unknown>): string | null {
+  const remediations = getIdxRemediations(payload);
+  for (const remediation of remediations) {
+    const href = typeof remediation.href === "string" ? remediation.href : null;
+    if (!href) continue;
+    if (
+      href.includes("/login/token/redirect") ||
+      href.includes("/oauth2/default/v1/authorize/redirect")
+    ) {
+      return href;
+    }
+  }
+  return null;
 }
 
 function parseOfferIdxFactors(payload: Record<string, unknown>): OfferFactor[] {
@@ -570,6 +668,48 @@ function parseOfferIdxFactors(payload: Record<string, unknown>): OfferFactor[] {
   }
 
   return factors;
+}
+
+function parseOfferIdxFactorsFromRemediationOptions(payload: Record<string, unknown>): OfferFactor[] {
+  const factors: OfferFactor[] = [];
+  for (const remediation of getIdxRemediations(payload)) {
+    const fields = asArray(remediation.value).map(asRecord).filter(Boolean) as Record<string, unknown>[];
+    const authenticatorField = fields.find((field) => field.name === "authenticator");
+    if (!authenticatorField) continue;
+    const options = asArray(authenticatorField.options).map(asRecord).filter(Boolean) as Record<string, unknown>[];
+    for (const option of options) {
+      const optionValue = asRecord(option.value);
+      const form = asRecord(optionValue?.form);
+      const formFields = asArray(form?.value).map(asRecord).filter(Boolean) as Record<string, unknown>[];
+      const idField = formFields.find((field) => field.name === "id");
+      const methodField = formFields.find((field) => field.name === "methodType");
+      const id = typeof idField?.value === "string" ? idField.value : null;
+      const methodType = typeof methodField?.value === "string" ? methodField.value : null;
+      if (!id || !methodType) continue;
+      factors.push({
+        id,
+        factorType: methodType,
+        provider: null,
+        vendorName: typeof option.label === "string" ? option.label : null,
+        label: typeof option.label === "string" ? option.label : null,
+      });
+    }
+  }
+  return factors;
+}
+
+function mergeOfferFactors(...groups: OfferFactor[][]): OfferFactor[] {
+  const merged: OfferFactor[] = [];
+  const seen = new Set<string>();
+  for (const group of groups) {
+    for (const factor of group) {
+      const key = `${factor.id}::${factor.factorType.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(factor);
+    }
+  }
+  return merged;
 }
 
 async function followOfferHtmlRedirects(
@@ -918,25 +1058,72 @@ async function completeOfferSessionFromStateToken(
   stateToken: string,
   jar: CookieJar,
   supabaseAdmin: ReturnType<typeof createClient>,
+  authorizeUrl?: string,
+  completionUrl?: string,
 ) {
   const userAgent = OFFER_BROWSER_USER_AGENT;
+  const runStateTokenAttempt = async (
+    initialUrl: string,
+    authPath: string,
+  ) => {
+    const finalResponse = await followRedirects(initialUrl, jar, {
+      method: "GET",
+      headers: {
+        "User-Agent": userAgent,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        Referer: "https://olxgroup.okta-emea.com/",
+      },
+    });
+    const postAuth = await followOfferHtmlRedirects(finalResponse, jar);
+    const enriched = await enrichOfferAdminSession(jar, postAuth.response);
+    const cookieHeader = buildOfferStandvirtualCookieHeader(jar);
+    const finalUrl = enriched.validatedUrl || postAuth.response.url;
+    return { postAuth, enriched, cookieHeader, finalUrl, authPath };
+  };
+
   const oktaRedirectUrl =
+    completionUrl ||
     `https://olxgroup.okta-emea.com/login/token/redirect?stateToken=${encodeURIComponent(stateToken)}`;
+  let attempt = await runStateTokenAttempt(oktaRedirectUrl, "stateTokenRedirect");
 
-  const finalResponse = await followRedirects(oktaRedirectUrl, jar, {
-    method: "GET",
-    headers: {
-      "User-Agent": userAgent,
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-      Referer: "https://olxgroup.okta-emea.com/",
-    },
-  });
-  const postAuth = await followOfferHtmlRedirects(finalResponse, jar);
+  const hasCertError = (current: typeof attempt) =>
+    current.postAuth.response.url.includes("/auth/cert/primaryAuth") ||
+    current.postAuth.response.url.includes("/cert/error") ||
+    current.postAuth.redirectChain.some((entry) => entry.includes("/login/cert") || entry.includes("/auth/cert/primaryAuth")) ||
+    current.postAuth.lastHtml.includes("piv.card.error.empty") ||
+    current.postAuth.lastHtml.includes("/cert/error");
+  const isOktaHome = (current: typeof attempt) =>
+    current.postAuth.response.url.includes("olxgroup.okta-emea.com/app/UserHome");
 
-  const enriched = await enrichOfferAdminSession(jar, postAuth.response);
-  const cookieHeader = buildOfferStandvirtualCookieHeader(jar);
-  const finalUrl = enriched.validatedUrl || postAuth.response.url;
+  // First retry through Standvirtual's own Okta entrypoint to preserve app context.
+  if (!attempt.enriched.validated && (isOktaHome(attempt) || hasCertError(attempt) || attempt.finalUrl.includes("/adminpanel/login/"))) {
+    attempt = await runStateTokenAttempt(
+      "https://www.standvirtual.com/adminpanel/login/loginwithokta/",
+      "stateTokenRedirect+loginwithokta",
+    );
+  }
+
+  const shouldRetryWithAuthorize =
+    !attempt.enriched.validated &&
+    Boolean(authorizeUrl) &&
+    (
+      isOktaHome(attempt) ||
+      attempt.finalUrl.includes("/adminpanel/login/")
+    ) &&
+    !hasCertError(attempt);
+
+  if (shouldRetryWithAuthorize && authorizeUrl) {
+    const resumeAuthorizeUrl = new URL(authorizeUrl);
+    // We only need app-context callback; keep current browser session context.
+    resumeAuthorizeUrl.searchParams.delete("sessionToken");
+    attempt = await runStateTokenAttempt(
+      resumeAuthorizeUrl.toString(),
+      "stateTokenRedirect+authorize",
+    );
+  }
+
+  const { postAuth, enriched, cookieHeader, finalUrl, authPath } = attempt;
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
   if (!enriched.validated) {
@@ -955,7 +1142,7 @@ async function completeOfferSessionFromStateToken(
       html_redirect_chain: postAuth.redirectChain,
       post_auth_debug: summarizeHtmlRedirectMechanism(postAuth.lastHtml),
       post_auth_snippet: postAuth.lastHtml.substring(0, 500),
-      auth_path: "stateTokenRedirect",
+      auth_path: authPath,
     }, 502);
   }
 
@@ -989,7 +1176,7 @@ async function completeOfferSessionFromStateToken(
     params_loaded: enriched.paramsText.length > 0,
     post_auth_url: postAuth.response.url,
     html_redirect_chain: postAuth.redirectChain,
-    auth_path: "stateTokenRedirect",
+    auth_path: authPath,
   });
 }
 
@@ -1138,7 +1325,7 @@ async function pollForOfferIdxStateToken(
         autoChallenge: true,
         stateHandle,
       },
-      "application/json",
+      OKTA_IDX_ION,
       "https://olxgroup.okta-emea.com/",
     ).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
 
@@ -1177,6 +1364,48 @@ Deno.serve(async (req) => {
   const path = url.pathname.replace(/^\/vas-api/, "");
 
   try {
+    if (path === "/offer/manual-cookie" && req.method === "POST") {
+      const { cookie } = await req.json();
+      const cookieHeader = typeof cookie === "string" ? cookie.trim() : "";
+
+      if (!cookieHeader) {
+        return json({ ok: false, error: "Missing cookie value" }, 400);
+      }
+
+      if (!cookieHeader.includes("=")) {
+        return json({ ok: false, error: "Invalid cookie format" }, 400);
+      }
+
+      const validation = await validateOfferAdminCookie(cookieHeader);
+      if (!validation.ok) {
+        return json({
+          ok: false,
+          error: "Cookie is not authenticated for Standvirtual admin",
+          detail: validation.finalUrl || `HTTP ${validation.status}`,
+        }, 401);
+      }
+
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+      const { data: offerSession, error: offerSessionError } = await supabaseAdmin
+        .from("offer_sessions")
+        .insert({
+          cookie_header: cookieHeader,
+          expires_at: expiresAt,
+        })
+        .select("offer_session_id")
+        .single();
+
+      if (offerSessionError || !offerSession) {
+        return json({ ok: false, error: "Failed to create Offer session" }, 500);
+      }
+
+      return json({
+        ok: true,
+        offer_session_id: offerSession.offer_session_id,
+        message: "Offer session cookie validated.",
+      });
+    }
+
     if (path === "/offer/login" && req.method === "POST") {
       const { username, password } = await req.json();
 
@@ -1215,8 +1444,6 @@ Deno.serve(async (req) => {
         );
       }
       const authorizeFlowUrl = new URL(authorizeUrl);
-      authorizeFlowUrl.searchParams.set("prompt", "login");
-      authorizeFlowUrl.searchParams.set("max_age", "0");
       const authorizeFlowUrlString = authorizeFlowUrl.toString();
 
       const authorizePage = await fetchWithJar(authorizeFlowUrlString, jar, {
@@ -1256,60 +1483,40 @@ Deno.serve(async (req) => {
       }
 
       const identifyRemediation = getIdxRemediation(idxJson, ["identify", "identify-authenticator"]);
-      if (!identifyRemediation) {
-        const deviceChallengeFactor = getIdxSyntheticPushFactor(idxJson);
-        const stateHandle = parseIdxStateHandle(idxJson);
-        if (deviceChallengeFactor && stateHandle) {
-          const pendingExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-          const { data: pendingOfferSession, error: pendingOfferSessionError } = await supabaseAdmin
-            .from("offer_sessions")
-            .insert({
-              cookie_header: buildCookieHeader(jar),
-              expires_at: pendingExpiresAt,
-            })
-            .select("offer_session_id")
-            .single();
-
-          if (pendingOfferSessionError || !pendingOfferSession) {
-            return json({ ok: false, error: "Failed to create pending Offer login session" }, 500);
-          }
-
+      if (identifyRemediation) {
+        try {
+          idxJson = await postIdxRemediation(
+            identifyRemediation,
+            jar,
+            {
+              identifier: username,
+              "credentials.passcode": password,
+            },
+            authorizeFlowUrlString,
+          );
+        } catch (error) {
           return json({
-            ok: true,
-            requires_mfa: true,
-            offer_session_id: pendingOfferSession.offer_session_id,
-            state_token: stateHandle,
-            authorize_url: authorizeFlowUrlString,
-            factors: [deviceChallengeFactor],
-            preferred_factor_id: deviceChallengeFactor.id,
-          });
+            ok: false,
+            error: "Offer authentication failed",
+            detail: error instanceof Error ? error.message : String(error),
+            step: "identify",
+          }, 401);
         }
-
-        return json({
-          ok: false,
-          error: "Okta IDX identify step was not available",
-          detail: JSON.stringify({
-            keys: Object.keys(idxJson),
-            remediations: getIdxRemediationNames(idxJson),
-          }).substring(0, 500),
-        }, 502);
-      }
-
-      try {
-        idxJson = await postIdxRemediation(
-          identifyRemediation,
-          jar,
-          {
-            identifier: username,
-          },
-          authorizeFlowUrlString,
-        );
-      } catch (error) {
-        return json({
-          ok: false,
-          error: "Offer authentication failed",
-          detail: error instanceof Error ? error.message : String(error),
-        }, 401);
+      } else {
+        const bootstrapStateHandle = parseIdxStateHandle(idxJson);
+        if (bootstrapStateHandle && hasIdxDeviceChallengePoll(idxJson)) {
+          try {
+            idxJson = await postIdxJson(
+              "https://olxgroup.okta-emea.com/idp/idx/authenticators/poll",
+              jar,
+              { stateHandle: bootstrapStateHandle },
+              "application/json",
+              authorizeFlowUrlString,
+            );
+          } catch {
+            // Best-effort refresh of the current IDX transaction.
+          }
+        }
       }
 
       const passwordRemediation = getIdxRemediation(idxJson, ["challenge-authenticator", "challenge-poll"]);
@@ -1332,6 +1539,7 @@ Deno.serve(async (req) => {
             ok: false,
             error: "Offer authentication failed",
             detail: error instanceof Error ? error.message : String(error),
+            step: "challenge-answer-password",
           }, 401);
         }
       }
@@ -1344,13 +1552,19 @@ Deno.serve(async (req) => {
         }, 502);
       }
 
-      const factors = parseOfferIdxFactors(idxJson);
+      const factors = mergeOfferFactors(
+        parseOfferIdxFactors(idxJson),
+        parseOfferIdxFactorsFromRemediationOptions(idxJson),
+      );
+      const idxCompletionUrl = getIdxCompletionUrl(idxJson);
       const preferredFactor = choosePreferredOfferFactor(factors);
       if (!preferredFactor) {
         const redirected = await completeOfferSessionFromStateToken(
           idxStateHandle,
           jar,
           supabaseAdmin,
+          authorizeFlowUrlString,
+          idxCompletionUrl ?? undefined,
         );
         return redirected;
       }
@@ -1429,6 +1643,7 @@ Deno.serve(async (req) => {
           polled.stateToken,
           cloneCookieJar(jar),
           supabaseAdmin,
+          authorize_url,
         );
       }
 
@@ -1444,7 +1659,7 @@ Deno.serve(async (req) => {
             },
             stateHandle: state_token,
           },
-          "application/json",
+          OKTA_IDX_ION,
           authorize_url,
         );
       } catch (error) {
@@ -1485,6 +1700,7 @@ Deno.serve(async (req) => {
             codeRemediation,
             jar,
             {
+              "credentials.totp": String(passcode).trim(),
               "credentials.passcode": String(passcode).trim(),
             },
             authorize_url,
@@ -1498,10 +1714,13 @@ Deno.serve(async (req) => {
         }
 
         const codeStateHandle = parseIdxStateHandle(idxJson) || state_token;
+        const idxCompletionUrl = getIdxCompletionUrl(idxJson);
         return await completeOfferSessionFromStateToken(
           codeStateHandle,
           cloneCookieJar(jar),
           supabaseAdmin,
+          authorize_url,
+          idxCompletionUrl ?? undefined,
         );
       }
 
@@ -1519,6 +1738,8 @@ Deno.serve(async (req) => {
         polled.stateToken,
         cloneCookieJar(jar),
         supabaseAdmin,
+        authorize_url,
+        undefined,
       );
     }
 

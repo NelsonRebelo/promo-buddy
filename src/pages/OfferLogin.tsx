@@ -2,15 +2,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { offerLogin } from "@/lib/api";
+import { Textarea } from "@/components/ui/textarea";
+import { offerLoginWithCookie } from "@/lib/api";
 
 const OfferLogin = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [cookieValue, setCookieValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,17 +25,18 @@ const OfferLogin = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const normalizedCookie = cookieValue.trim();
+    if (!normalizedCookie) {
+      setError("Paste the full cookie value.");
+      return;
+    }
     setLoading(true);
     try {
-      const res = await offerLogin(form);
+      const res = await offerLoginWithCookie({ cookie: normalizedCookie });
       if (res.ok) {
-        if (res.requires_mfa) {
-          navigate("/offer-mfa", { replace: true });
-          return;
-        }
         navigate("/offer-runner", { replace: true });
       } else {
-        setError(res.detail || res.error || "Offer promotion login failed.");
+        setError(res.detail || res.error || "Offer session cookie is invalid.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error");
@@ -74,7 +75,7 @@ const OfferLogin = () => {
             <CardHeader className="items-center space-y-4 pb-2 text-center">
               <img src="/olx-group-logo.png" alt="OLX Group" className="h-12 w-auto object-contain" />
               <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-                Login with your OKTA credentials
+                Paste the full Standvirtual cookie to continue
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -85,27 +86,15 @@ const OfferLogin = () => {
                   </Alert>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="offer-username" className="text-sm font-medium">
-                    Username
+                  <Label htmlFor="offer-cookie" className="text-sm font-medium">
+                    Cookie
                   </Label>
-                  <Input
-                    id="offer-username"
-                    value={form.username}
-                    onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))}
-                    className="h-11 rounded-xl bg-white/70"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="offer-password" className="text-sm font-medium">
-                    Password
-                  </Label>
-                  <Input
-                    id="offer-password"
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))}
-                    className="h-11 rounded-xl bg-white/70"
+                  <Textarea
+                    id="offer-cookie"
+                    value={cookieValue}
+                    onChange={(e) => setCookieValue(e.target.value)}
+                    className="min-h-[170px] rounded-xl bg-white/70 font-mono text-xs"
+                    placeholder="Paste full cookie header value"
                     required
                   />
                 </div>
@@ -113,10 +102,10 @@ const OfferLogin = () => {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Testing login...
+                      Validating cookie...
                     </>
                   ) : (
-                    "Continue"
+                    "Use cookie"
                   )}
                 </Button>
               </form>
