@@ -156,6 +156,17 @@ const FLIRTY_QUOTES = [
   "Tu mereces paz.",
   "TELEPATIAAAAA. Silêncio calma. FEITIÇARIIIIAAAA.",
   "Agora além de evangélicas, somos ambas misteriosas!",
+  "These VAS will be NOT BE FREE to the seller. TO BE OR NOT TO BE, THAT IS THE QUESTION.",
+  "Queres frases novas? Hmmm não sei..",
+  "Era para seguir o instinto, mas segui o extintor.",
+  "Fui ler as instruções e acabei a montar uma cadeira em espanhol.",
+  "O plano era ser discreto. Li “descrito” e comecei a explicar tudo.",
+  "Era para tomar decisões. Li “doces” e fui à pastelaria.",
+  "Queria escrever “bom dia”, mas saiu “dom bia”. Parece nome de padre.",
+  "Fui procurar paz interior, mas li “pás interior” e acabei no Leroy Merlin.",
+  "O chef disse “sal a gosto”. Li “sol a gosto” e levei o prato à janela.",
+  "Era para “pensar positivo”. Li “pastel positivo” e agora acredito em sobremesas.",
+  "Li “reunião às três” como “refeição às três”. Estive mais motivado.",
 ];
 
 function pickNonRepeatingQuote(quotes: string[], storageKey: string) {
