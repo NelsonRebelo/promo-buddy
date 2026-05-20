@@ -1856,21 +1856,24 @@ Deno.serve(async (req) => {
         const finalUrl = upstreamRes.url;
         const responseText = await upstreamRes.text().catch(() => "");
         const loginUrlMarker = "https://www.standvirtual.com/adminpanel/login/";
+        const paymentUrlMarker = "https://www.standvirtual.com/adminpanel/pagamento/";
         const statsRedirectedToLogin = statsRes.url.includes(loginUrlMarker);
         const paymentRedirectedToLogin = finalUrl.includes(loginUrlMarker);
         const responseContainsLoginUrl = responseText.includes(loginUrlMarker);
+        const paymentLandedOnPagamento = finalUrl.startsWith(paymentUrlMarker);
         const successStatus = status === 200 || status === 201 || status === 202;
         const success =
           successStatus &&
-          !statsRedirectedToLogin &&
-          !paymentRedirectedToLogin &&
-          !responseContainsLoginUrl;
+          paymentLandedOnPagamento &&
+          !paymentRedirectedToLogin;
         const message = success
           ? "Offer promotion request completed successfully."
           : statsRedirectedToLogin
             ? "Standvirtual redirected to login. The captured cookie is not valid for this request."
           : paymentRedirectedToLogin
             ? "Standvirtual redirected the payment request. The session is valid, but this promotion may not be available for this advert or current state."
+          : !paymentLandedOnPagamento
+            ? "Standvirtual did not return to the payment page for this request."
           : responseContainsLoginUrl
             ? "Standvirtual returned a login-like response for the payment request. Check this advert and promotion eligibility."
           : responseText.substring(0, 500) || `HTTP ${status}`;
