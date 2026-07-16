@@ -115,9 +115,9 @@ function getParsedMessage(errorMessage?: string): string {
       return (parsed.error as { message: string }).message;
     }
   } catch {
-    // Ignore non-JSON strings because only parsed message values should be shown.
+    return errorMessage;
   }
-  return "";
+  return errorMessage;
 }
 
 const CONCURRENCY = 5;

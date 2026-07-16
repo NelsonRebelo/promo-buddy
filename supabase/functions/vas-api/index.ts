@@ -2049,25 +2049,27 @@ Deno.serve(async (req) => {
       }
 
       try {
+        const upstreamUrl = `${session.base_url}/account/adverts/${encodeURIComponent(advert)}/promotions/`;
+        const upstreamPayload = {
+          payment_type: "account",
+          promotion_ids: [promotionId],
+        };
         const upstreamRes = await fetch(
-          `${session.base_url}/account/adverts/${encodeURIComponent(advert)}/promotions/`,
+          upstreamUrl,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify({
-              payment_type: "account",
-              promotion_ids: [promotionId],
-            }),
+            body: JSON.stringify(upstreamPayload),
           }
         );
 
         const status = upstreamRes.status;
 
         if (status === 200 || status === 201 || status === 202) {
-          return json({ success: true, advert, promotion, status });
+          return json({ success: true, advert, promotion, status, upstreamUrl, upstreamPayload });
         }
 
         let errorMessage = `HTTP ${status}`;
@@ -2076,7 +2078,7 @@ Deno.serve(async (req) => {
           if (errBody) errorMessage = errBody.substring(0, 500);
         } catch {}
 
-        return json({ success: false, advert, promotion, status, errorMessage });
+        return json({ success: false, advert, promotion, status, errorMessage, upstreamUrl, upstreamPayload });
       } catch (err) {
         return json({
           success: false,
