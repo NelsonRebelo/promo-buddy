@@ -78,6 +78,25 @@ function buildCookieHeader(jar: CookieJar): string {
     .join("; ");
 }
 
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function buildRedactedCurl(url: string, payload: Record<string, unknown>): string {
+  return [
+    "curl",
+    shellSingleQuote(url),
+    "-X",
+    "POST",
+    "-H",
+    shellSingleQuote("Content-Type: application/json"),
+    "-H",
+    shellSingleQuote("Authorization: Bearer <redacted>"),
+    "--data-raw",
+    shellSingleQuote(JSON.stringify(payload)),
+  ].join(" ");
+}
+
 function cookieHeaderToJar(cookieHeader: string): CookieJar {
   const jar: CookieJar = new Map();
   for (const cookie of cookieHeader.split(";")) {
@@ -2054,6 +2073,7 @@ Deno.serve(async (req) => {
           payment_type: "account",
           promotion_ids: [promotionId],
         };
+        const upstreamCurl = buildRedactedCurl(upstreamUrl, upstreamPayload);
         const upstreamRes = await fetch(
           upstreamUrl,
           {
@@ -2069,7 +2089,7 @@ Deno.serve(async (req) => {
         const status = upstreamRes.status;
 
         if (status === 200 || status === 201 || status === 202) {
-          return json({ success: true, advert, promotion, status, upstreamUrl, upstreamPayload });
+          return json({ success: true, advert, promotion, status, upstreamUrl, upstreamPayload, upstreamCurl });
         }
 
         let errorMessage = `HTTP ${status}`;
@@ -2078,7 +2098,7 @@ Deno.serve(async (req) => {
           if (errBody) errorMessage = errBody.substring(0, 500);
         } catch {}
 
-        return json({ success: false, advert, promotion, status, errorMessage, upstreamUrl, upstreamPayload });
+        return json({ success: false, advert, promotion, status, errorMessage, upstreamUrl, upstreamPayload, upstreamCurl });
       } catch (err) {
         return json({
           success: false,
