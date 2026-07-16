@@ -82,7 +82,7 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function buildRedactedCurl(url: string, payload: Record<string, unknown>): string {
+function buildInvestmentCurl(url: string, payload: Record<string, unknown>, accessToken: string): string {
   return [
     "curl",
     shellSingleQuote(url),
@@ -91,7 +91,7 @@ function buildRedactedCurl(url: string, payload: Record<string, unknown>): strin
     "-H",
     shellSingleQuote("Content-Type: application/json"),
     "-H",
-    shellSingleQuote("Authorization: Bearer <redacted>"),
+    shellSingleQuote(`Authorization: Bearer ${accessToken}`),
     "--data-raw",
     shellSingleQuote(JSON.stringify(payload)),
   ].join(" ");
@@ -2073,7 +2073,7 @@ Deno.serve(async (req) => {
           payment_type: "account",
           promotion_ids: [promotionId],
         };
-        const upstreamCurl = buildRedactedCurl(upstreamUrl, upstreamPayload);
+        const upstreamCurl = buildInvestmentCurl(upstreamUrl, upstreamPayload, session.access_token);
         const upstreamRes = await fetch(
           upstreamUrl,
           {
