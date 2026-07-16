@@ -2037,6 +2037,17 @@ Deno.serve(async (req) => {
         return json({ success: false, advert, promotion, status: 400, errorMessage: "Missing advert or promotion" }, 400);
       }
 
+      const promotionId = Number(promotion);
+      if (!Number.isSafeInteger(promotionId)) {
+        return json({
+          success: false,
+          advert,
+          promotion,
+          status: 400,
+          errorMessage: "Promotion must be a numeric ID",
+        }, 400);
+      }
+
       try {
         const upstreamRes = await fetch(
           `${session.base_url}/account/adverts/${encodeURIComponent(advert)}/promotions/`,
@@ -2048,7 +2059,7 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               payment_type: "account",
-              promotion_ids: [promotion],
+              promotion_ids: [promotionId],
             }),
           }
         );
