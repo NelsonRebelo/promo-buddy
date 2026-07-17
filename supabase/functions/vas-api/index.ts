@@ -106,6 +106,14 @@ function buildBearerToken(accessToken: string): string {
     : `Bearer ${trimmedToken}`;
 }
 
+function headersToObject(headers: Headers): Record<string, string> {
+  const result: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    result[key] = value;
+  });
+  return result;
+}
+
 function cookieHeaderToJar(cookieHeader: string): CookieJar {
   const jar: CookieJar = new Map();
   for (const cookie of cookieHeader.split(";")) {
@@ -2100,18 +2108,25 @@ Deno.serve(async (req) => {
         );
 
         const status = upstreamRes.status;
+        const responseText = await upstreamRes.text().catch(() => "");
+        const upstreamDiagnostics = {
+          upstreamUrl,
+          upstreamFinalUrl: upstreamRes.url,
+          upstreamPayload,
+          upstreamCurl,
+          upstreamResponseHeaders: headersToObject(upstreamRes.headers),
+          upstreamResponseContentType: upstreamRes.headers.get("content-type"),
+          upstreamResponsePreview: responseText.substring(0, 2000),
+        };
 
         if (status === 200 || status === 201 || status === 202) {
-          return json({ success: true, advert, promotion, status, upstreamUrl, upstreamPayload, upstreamCurl });
+          return json({ success: true, advert, promotion, status, ...upstreamDiagnostics });
         }
 
         let errorMessage = `HTTP ${status}`;
-        try {
-          const errBody = await upstreamRes.text();
-          if (errBody) errorMessage = errBody.substring(0, 500);
-        } catch {}
+        if (responseText) errorMessage = responseText.substring(0, 500);
 
-        return json({ success: false, advert, promotion, status, errorMessage, upstreamUrl, upstreamPayload, upstreamCurl });
+        return json({ success: false, advert, promotion, status, errorMessage, ...upstreamDiagnostics });
       } catch (err) {
         return json({
           success: false,
