@@ -383,7 +383,21 @@ const Runner = () => {
       </header>
 
       <main className="section-shell relative mt-8 pb-6">
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="relative z-20 mx-auto mb-8 flex max-w-2xl flex-col items-center rounded-[2rem] border border-white/80 bg-white/86 px-6 py-7 text-center shadow-2xl shadow-sky-900/10 backdrop-blur-xl">
+          <p className="max-w-xl text-balance text-xl font-semibold leading-8 text-slate-800">
+            This feature is not working and is being fixed. I'm sorry for the inconvenience.
+          </p>
+          <img
+            src="/promo-buddy-sad.png"
+            alt="Sad Promo Buddy"
+            className="mt-5 h-44 w-auto object-contain drop-shadow-[0_18px_35px_rgba(15,23,42,0.18)] sm:h-56"
+          />
+        </section>
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none grid select-none items-start gap-6 blur-sm xl:grid-cols-[minmax(0,1fr)_320px]"
+        >
           <section className="space-y-8">
             <Card className="glass rounded-[2rem] border-white/80 bg-white/84 shadow-lg">
               <CardContent className="space-y-5 py-5">
