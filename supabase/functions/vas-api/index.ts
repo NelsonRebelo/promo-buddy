@@ -2085,16 +2085,18 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const upstreamUrl = `${session.base_url}/account/adverts/${encodeURIComponent(advert)}/promotions/`;
+        const upstreamUrl = `${session.base_url}/account/adverts/${encodeURIComponent(advert)}/promotions`;
         const upstreamPayload = {
           payment_type: "account",
           promotion_ids: [promotionId],
         };
         const upstreamHeaders = {
           Accept: "*/*",
+          "Accept-Language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
           "Content-Type": "application/json",
           Authorization: buildBearerToken(session.access_token),
           "Cache-Control": "no-cache",
+          Pragma: "no-cache",
           "User-Agent": "PostmanRuntime/7.44.1",
         };
         const upstreamCurl = buildInvestmentCurl(upstreamUrl, upstreamPayload, upstreamHeaders);
