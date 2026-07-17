@@ -36,7 +36,6 @@ type Result = {
   success: boolean;
   status: number | string;
   errorMessage?: string;
-  diagnostics?: unknown;
 };
 
 const PROMOTION_OPTIONS: PromotionOption[] = [
@@ -249,18 +248,6 @@ const Runner = () => {
     }
   };
 
-  const copyFailureDiagnostics = async (failure: Result) => {
-    const debugPayload = {
-      advert: failure.advert,
-      promotion: getPromotionLabel(failure.promotion) || failure.promotion,
-      status: failure.status,
-      message: getParsedMessage(failure.errorMessage),
-      diagnostics: failure.diagnostics,
-    };
-
-    await navigator.clipboard.writeText(JSON.stringify(debugPayload, null, 2));
-  };
-
   const run = async () => {
     cancelRef.current = false;
     setRunning(true);
@@ -291,7 +278,6 @@ const Runner = () => {
             success: data.success,
             status: data.status || httpStatus,
             errorMessage: data.errorMessage,
-            diagnostics: data,
           };
 
           allResults.push(result);
@@ -735,7 +721,6 @@ const Runner = () => {
                             <TableHead className="text-center">Advert</TableHead>
                             <TableHead className="text-center">Promotion</TableHead>
                             <TableHead className="text-center">Message</TableHead>
-                            <TableHead className="text-center">Debug</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -745,18 +730,6 @@ const Runner = () => {
                               <TableCell className="text-center">{getPromotionLabel(f.promotion) || f.promotion}</TableCell>
                               <TableCell className="max-w-xs truncate text-center text-sm">
                                 {getParsedMessage(f.errorMessage)}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="rounded-full"
-                                  onClick={() => void copyFailureDiagnostics(f)}
-                                >
-                                  <Copy className="mr-2 h-3.5 w-3.5" />
-                                  Copy debug
-                                </Button>
                               </TableCell>
                             </TableRow>
                           ))}

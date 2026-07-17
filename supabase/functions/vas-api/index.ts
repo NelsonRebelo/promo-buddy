@@ -78,42 +78,6 @@ function buildCookieHeader(jar: CookieJar): string {
     .join("; ");
 }
 
-function shellSingleQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function buildInvestmentCurl(url: string, payload: Record<string, unknown>, headers: Record<string, string>): string {
-  const headerParts = Object.entries(headers).flatMap(([name, value]) => [
-    "-H",
-    shellSingleQuote(`${name}: ${value}`),
-  ]);
-
-  return [
-    "curl",
-    shellSingleQuote(url),
-    "-X",
-    "POST",
-    ...headerParts,
-    "--data-raw",
-    shellSingleQuote(JSON.stringify(payload)),
-  ].join(" ");
-}
-
-function buildBearerToken(accessToken: string): string {
-  const trimmedToken = accessToken.trim();
-  return trimmedToken.toLowerCase().startsWith("bearer ")
-    ? trimmedToken
-    : `Bearer ${trimmedToken}`;
-}
-
-function headersToObject(headers: Headers): Record<string, string> {
-  const result: Record<string, string> = {};
-  headers.forEach((value, key) => {
-    result[key] = value;
-  });
-  return result;
-}
-
 function cookieHeaderToJar(cookieHeader: string): CookieJar {
   const jar: CookieJar = new Map();
   for (const cookie of cookieHeader.split(";")) {
@@ -2085,45 +2049,34 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const upstreamUrl = `${session.base_url}/account/adverts/${encodeURIComponent(advert)}/promotions`;
-        const upstreamPayload = {
-          payment_type: "account",
-          promotion_ids: [promotionId],
-        };
-        const upstreamHeaders = {
-          "Content-Type": "application/json",
-          Authorization: buildBearerToken(session.access_token),
-        };
-        const upstreamCurl = buildInvestmentCurl(upstreamUrl, upstreamPayload, upstreamHeaders);
         const upstreamRes = await fetch(
-          upstreamUrl,
+          `${session.base_url}/account/adverts/${encodeURIComponent(advert)}/promotions/`,
           {
             method: "POST",
-            headers: upstreamHeaders,
-            body: JSON.stringify(upstreamPayload),
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              payment_type: "account",
+              promotion_ids: [promotionId],
+            }),
           }
         );
 
         const status = upstreamRes.status;
-        const responseText = await upstreamRes.text().catch(() => "");
-        const upstreamDiagnostics = {
-          upstreamUrl,
-          upstreamFinalUrl: upstreamRes.url,
-          upstreamPayload,
-          upstreamCurl,
-          upstreamResponseHeaders: headersToObject(upstreamRes.headers),
-          upstreamResponseContentType: upstreamRes.headers.get("content-type"),
-          upstreamResponsePreview: responseText.substring(0, 2000),
-        };
 
         if (status === 200 || status === 201 || status === 202) {
-          return json({ success: true, advert, promotion, status, ...upstreamDiagnostics });
+          return json({ success: true, advert, promotion, status });
         }
 
         let errorMessage = `HTTP ${status}`;
-        if (responseText) errorMessage = responseText.substring(0, 500);
+        try {
+          const errBody = await upstreamRes.text();
+          if (errBody) errorMessage = errBody.substring(0, 500);
+        } catch {}
 
-        return json({ success: false, advert, promotion, status, errorMessage, ...upstreamDiagnostics });
+        return json({ success: false, advert, promotion, status, errorMessage });
       } catch (err) {
         return json({
           success: false,
