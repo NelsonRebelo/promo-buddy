@@ -82,19 +82,28 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function buildInvestmentCurl(url: string, payload: Record<string, unknown>, accessToken: string): string {
+function buildInvestmentCurl(url: string, payload: Record<string, unknown>, headers: Record<string, string>): string {
+  const headerParts = Object.entries(headers).flatMap(([name, value]) => [
+    "-H",
+    shellSingleQuote(`${name}: ${value}`),
+  ]);
+
   return [
     "curl",
     shellSingleQuote(url),
     "-X",
     "POST",
-    "-H",
-    shellSingleQuote("Content-Type: application/json"),
-    "-H",
-    shellSingleQuote(`Authorization: Bearer ${accessToken}`),
+    ...headerParts,
     "--data-raw",
     shellSingleQuote(JSON.stringify(payload)),
   ].join(" ");
+}
+
+function buildBearerToken(accessToken: string): string {
+  const trimmedToken = accessToken.trim();
+  return trimmedToken.toLowerCase().startsWith("bearer ")
+    ? trimmedToken
+    : `Bearer ${trimmedToken}`;
 }
 
 function cookieHeaderToJar(cookieHeader: string): CookieJar {
@@ -2073,15 +2082,19 @@ Deno.serve(async (req) => {
           payment_type: "account",
           promotion_ids: [promotionId],
         };
-        const upstreamCurl = buildInvestmentCurl(upstreamUrl, upstreamPayload, session.access_token);
+        const upstreamHeaders = {
+          Accept: "*/*",
+          "Content-Type": "application/json",
+          Authorization: buildBearerToken(session.access_token),
+          "Cache-Control": "no-cache",
+          "User-Agent": "PostmanRuntime/7.44.1",
+        };
+        const upstreamCurl = buildInvestmentCurl(upstreamUrl, upstreamPayload, upstreamHeaders);
         const upstreamRes = await fetch(
           upstreamUrl,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
+            headers: upstreamHeaders,
             body: JSON.stringify(upstreamPayload),
           }
         );
