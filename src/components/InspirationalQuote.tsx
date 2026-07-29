@@ -48,6 +48,21 @@ const FLIRTY_QUOTES = [
   "Sabias que a Torre Eiffel cresce no verão?",
   "Sabias que as borboletas provam comida com os pés?",
   "Sabias que os caracóis podem fazer preliminares durante horas?",
+  "Imagine us sneaking off somewhere… what would happen next?",
+  "I can’t stop thinking about feeling your hands on me",
+  "If you were here, I wouldn’t be able to keep my hands off you",
+  "I was thinking about our last night together… I have a surprise planned for next time 😘",
+  "Guess what I’m *not* wearing right now?",
+  "I wish you could see me right now – let me describe it to you",
+  "I want you to do *that* to me again tonight",
+  "Tell me what you’d like to do if we were alone…",
+  "What was your favourite part of last night?",
+  "I’ve just got out of the shower… wish you were here 😏",
+  "I hope you know I’m thinking about you right now",
+  "No one makes me feel as good as you do",
+  "I can still taste you",
+  "Guess what I’m imagining right now…",
+  "My days are more fun when you’re in them",
 ];
 
 function pickNonRepeatingQuote(quotes: string[], storageKey: string) {
