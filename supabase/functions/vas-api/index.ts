@@ -1969,7 +1969,18 @@ Deno.serve(async (req) => {
         .single();
 
       if (insertError || !session) {
-        return json({ ok: false, error: "Failed to create session" }, 500);
+        return json({
+          ok: false,
+          error: "Failed to create session",
+          detail: insertError
+            ? {
+                code: insertError.code,
+                message: insertError.message,
+                details: insertError.details,
+                hint: insertError.hint,
+              }
+            : "Insert completed without returning a session row",
+        }, 500);
       }
 
       return json({ ok: true, session_id: session.session_id, token_expires_at: session.token_expires_at });
@@ -1999,6 +2010,20 @@ Deno.serve(async (req) => {
       }
 
       return json({ loggedIn: true, token_expires_at: data.token_expires_at });
+    }
+
+    // ─── GET /keepalive ───
+    if (path === "/keepalive" && req.method === "GET") {
+      const { error } = await supabaseAdmin
+        .from("sessions")
+        .select("session_id", { count: "exact", head: true })
+        .limit(1);
+
+      if (error) {
+        return json({ ok: false, error: "Keepalive failed" }, 500);
+      }
+
+      return json({ ok: true, checked_at: new Date().toISOString() });
     }
 
     // ─── POST /logout ───
