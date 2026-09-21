@@ -26,7 +26,6 @@ import {
   X,
 } from "lucide-react";
 import { clearOfferSession, getOfferStatus, sendOfferPromotion } from "@/lib/api";
-import { InspirationalQuote } from "@/components/InspirationalQuote";
 
 type CsvRow = { advert: string; promotion: string };
 type PromotionOption = { name: string; id: string };
@@ -763,7 +762,6 @@ const OfferRunner = () => {
           </div>
         </div>
       )}
-      <InspirationalQuote />
     </div>
   );
 };

@@ -26,7 +26,6 @@ import {
   X,
 } from "lucide-react";
 import { getStatus, sendVas, logout } from "@/lib/api";
-import { InspirationalQuote } from "@/components/InspirationalQuote";
 
 type CsvRow = { advert: string; promotion: string };
 type PromotionOption = { name: string; id: string };
@@ -817,7 +816,6 @@ const Runner = () => {
           </div>
         </div>
       )}
-      <InspirationalQuote />
     </div>
   );
 };
