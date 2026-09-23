@@ -30,6 +30,8 @@ const OrderAuthLogin = ({
 }: OrderAuthLoginProps) => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [message, setMessage] = useState("");
@@ -64,20 +66,63 @@ const OrderAuthLogin = ({
     }
 
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithOtp({
-      email: normalizedEmail,
-      options: {
-        emailRedirectTo: import.meta.env.VITE_APP_URL || window.location.origin,
-      },
-    });
-    setLoading(false);
+    if (!codeSent) {
+      const { error: signInError } = await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+      });
+      setLoading(false);
 
-    if (signInError) {
-      setError(signInError.message);
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      setCodeSent(true);
+      setMessage("Check your email and enter the login code to continue.");
       return;
     }
 
-    setMessage("Check your email and open the login link to continue.");
+    const normalizedCode = code.replace(/\s/g, "");
+    if (!normalizedCode) {
+      setLoading(false);
+      setError("Enter the code from your email.");
+      return;
+    }
+
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email: normalizedEmail,
+      token: normalizedCode,
+      type: "email",
+    });
+
+    if (verifyError) {
+      setLoading(false);
+      setError(verifyError.message);
+      return;
+    }
+
+    const status = await getOrderStatus().catch(() => null);
+    setLoading(false);
+
+    if (!status?.loggedIn) {
+      setError("Login succeeded, but the session could not be confirmed. Please try again.");
+      return;
+    }
+    if (!status.allowed) {
+      await supabase.auth.signOut();
+      setError("This email is not allowed to use Order Management.");
+      return;
+    }
+
+    navigate(redirectTo, { replace: true });
+  };
+
+  const handleUseDifferentEmail = async () => {
+    await supabase.auth.signOut();
+    setCode("");
+    setCodeSent(false);
+    setMessage("");
+    setError("");
   };
 
   if (checking) {
@@ -156,9 +201,27 @@ const OrderAuthLogin = ({
                     onChange={(event) => setEmail(event.target.value)}
                     className="h-11 rounded-xl bg-white/70 transition-shadow duration-300 focus-visible:ring-2"
                     placeholder="name@olx.com"
+                    disabled={codeSent || loading}
                     required
                   />
                 </div>
+                {codeSent && (
+                  <div className="space-y-2">
+                    <Label htmlFor="code" className="text-sm font-medium">
+                      Login code
+                    </Label>
+                    <Input
+                      id="code"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={code}
+                      onChange={(event) => setCode(event.target.value)}
+                      className="h-11 rounded-xl bg-white/70 text-center text-lg tracking-[0.35em] transition-shadow duration-300 focus-visible:ring-2"
+                      placeholder="000000"
+                      required
+                    />
+                  </div>
+                )}
                 <Button
                   type="submit"
                   className="h-11 w-full rounded-xl text-sm font-medium shadow-sm transition-all duration-300 hover:shadow-md"
@@ -167,12 +230,25 @@ const OrderAuthLogin = ({
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending login link...
+                      {codeSent ? "Checking code..." : "Sending code..."}
                     </>
+                  ) : codeSent ? (
+                    "Verify code"
                   ) : (
-                    "Send login link"
+                    "Send login code"
                   )}
                 </Button>
+                {codeSent && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 w-full rounded-xl text-xs font-medium text-muted-foreground"
+                    onClick={handleUseDifferentEmail}
+                    disabled={loading}
+                  >
+                    Use a different email
+                  </Button>
+                )}
               </form>
             </CardContent>
           </Card>

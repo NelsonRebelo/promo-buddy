@@ -25,7 +25,6 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { getOrderStatus, logoutOrderManagement } from "@/lib/api";
 
 type CsvRow = { advert: string; promotion: string };
 type PromotionOption = { name: string; id: string };
@@ -104,7 +103,6 @@ function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
 
 const OrderRunner = () => {
   const navigate = useNavigate();
-  const [checking, setChecking] = useState(true);
   const [rows, setRows] = useState<CsvRow[]>([]);
   const [csvError, setCsvError] = useState("");
   const [running, setRunning] = useState(false);
@@ -134,15 +132,6 @@ const OrderRunner = () => {
     (failuresPage - 1) * FAILURES_PER_PAGE,
     failuresPage * FAILURES_PER_PAGE,
   );
-
-  useEffect(() => {
-    getOrderStatus()
-      .then((status) => {
-        if (!status.loggedIn || !status.allowed) navigate("/", { replace: true });
-      })
-      .catch(() => navigate("/", { replace: true }))
-      .finally(() => setChecking(false));
-  }, [navigate]);
 
   useEffect(() => {
     if (!done || progress < 100 || !preparedRef.current) return;
@@ -271,9 +260,8 @@ const OrderRunner = () => {
     setDone(true);
   };
 
-  const handleExit = async () => {
-    await logoutOrderManagement();
-    navigate("/", { replace: true });
+  const handleExit = () => {
+    navigate("/old-system", { replace: true });
   };
 
   const handleBack = () => {
@@ -283,14 +271,6 @@ const OrderRunner = () => {
     }
     navigate("/", { replace: true });
   };
-
-  if (checking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   return (
     <div className="relative min-h-screen overflow-hidden pb-10">
