@@ -25,12 +25,7 @@ Optional Supabase function secrets:
 
 - `ORDER_MANAGEMENT_API_URL`
 
-Order Management access is controlled by `public.order_management_users`.
-Add one row per allowed user with:
-
-- `email`
-- `uuid`
-- `enabled = true`
+The user UUID is entered manually in the runner screens for now.
 
 ## Local run
 

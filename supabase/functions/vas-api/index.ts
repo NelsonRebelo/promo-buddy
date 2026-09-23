@@ -1358,7 +1358,6 @@ const supabaseAdmin = createClient(
 type OrderMethod = "postpay" | "admin";
 type OrderUser = {
   email: string;
-  uuid: string;
 };
 
 function getBearerToken(req: Request): string | null {
@@ -1382,26 +1381,12 @@ async function getOrderUser(req: Request): Promise<
     return { ok: false, status: 401, error: "Not authenticated" };
   }
 
-  const { data: match, error: matchError } = await supabaseAdmin
-    .from("order_management_users")
-    .select("email, uuid, enabled")
-    .eq("email", email)
-    .eq("enabled", true)
-    .maybeSingle();
-
-  if (matchError) {
-    return { ok: false, status: 500, error: "Failed to validate access" };
-  }
-
-  if (!match?.uuid) {
-    return { ok: false, status: 403, error: "This email is not allowed to use Promo Buddy." };
-  }
-
-  return { ok: true, user: { email, uuid: String(match.uuid) } };
+  return { ok: true, user: { email } };
 }
 
 async function sendOrderManagementRequest(params: {
   user: OrderUser;
+  userUuid: string;
   advert: string;
   promotion: string;
   method: OrderMethod;
@@ -1426,6 +1411,7 @@ async function sendOrderManagementRequest(params: {
 
   const promotionId = Number(params.promotion);
   const advertId = Number(params.advert);
+  const userUuid = params.userUuid.trim();
   if (!Number.isSafeInteger(promotionId) || !Number.isSafeInteger(advertId)) {
     return json(
       {
@@ -1438,11 +1424,23 @@ async function sendOrderManagementRequest(params: {
       400,
     );
   }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userUuid)) {
+    return json(
+      {
+        success: false,
+        advert: params.advert,
+        promotion: params.promotion,
+        status: 400,
+        errorMessage: "User UUID must be a valid UUID.",
+      },
+      400,
+    );
+  }
 
   const payload = {
     site_urn: "urn:site:standvirtualcom",
     user: {
-      uuid: params.user.uuid,
+      uuid: userUuid,
     },
     payments: [
       {
@@ -1543,8 +1541,9 @@ Deno.serve(async (req) => {
         return json({ success: false, errorMessage: orderUser.error }, orderUser.status);
       }
 
-      const { advert, promotion, method } = await req.json();
+      const { advert, promotion, method, user_uuid, userUuid } = await req.json();
       const normalizedMethod = String(method || "").trim().toLowerCase();
+      const normalizedUserUuid = String(user_uuid || userUuid || "").trim();
       if (normalizedMethod !== "postpay" && normalizedMethod !== "admin") {
         return json({
           success: false,
@@ -1552,6 +1551,16 @@ Deno.serve(async (req) => {
           promotion,
           status: 400,
           errorMessage: "Invalid order method.",
+        }, 400);
+      }
+
+      if (!normalizedUserUuid) {
+        return json({
+          success: false,
+          advert,
+          promotion,
+          status: 400,
+          errorMessage: "Missing user UUID",
         }, 400);
       }
 
@@ -1567,6 +1576,7 @@ Deno.serve(async (req) => {
 
       return await sendOrderManagementRequest({
         user: orderUser.user,
+        userUuid: normalizedUserUuid,
         advert: String(advert),
         promotion: String(promotion),
         method: normalizedMethod,

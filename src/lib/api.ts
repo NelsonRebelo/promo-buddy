@@ -151,10 +151,15 @@ export async function getOrderStatus() {
   return res.json();
 }
 
-export async function sendOrderPromotion(advert: string, promotion: string, method: "postpay" | "admin") {
+export async function sendOrderPromotion(
+  advert: string,
+  promotion: string,
+  method: "postpay" | "admin",
+  userUuid: string,
+) {
   const res = await orderRequest("/order/send", {
     method: "POST",
-    body: JSON.stringify({ advert, promotion, method }),
+    body: JSON.stringify({ advert, promotion, method, user_uuid: userUuid }),
   });
   return { status: res.status, data: await res.json() };
 }
@@ -192,8 +197,8 @@ export async function getStatus() {
   return getOrderStatus();
 }
 
-export async function sendVas(advert: string, promotion: string) {
-  return sendOrderPromotion(advert, promotion, "postpay");
+export async function sendVas(advert: string, promotion: string, userUuid: string) {
+  return sendOrderPromotion(advert, promotion, "postpay", userUuid);
 }
 
 export async function offerLogin(data: { username: string; password: string }) {
@@ -278,8 +283,8 @@ export async function getOfferStatus() {
   return getOrderStatus();
 }
 
-export async function sendOfferPromotion(advert: string, promotion: string) {
-  return sendOrderPromotion(advert, promotion, "admin");
+export async function sendOfferPromotion(advert: string, promotion: string, userUuid: string) {
+  return sendOrderPromotion(advert, promotion, "admin", userUuid);
 }
 
 export async function clearOfferSession() {

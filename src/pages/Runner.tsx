@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
@@ -121,6 +122,8 @@ function getParsedMessage(errorMessage?: string): string {
 
 const CONCURRENCY = 5;
 const REQUEST_DELAY_MS = 300;
+const USER_UUID_KEY = "promo_buddy_manual_user_uuid";
+const USER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
@@ -140,6 +143,8 @@ const Runner = () => {
   const [failuresPage, setFailuresPage] = useState(1);
   const [copyingFailures, setCopyingFailures] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [userUuid, setUserUuid] = useState(() => localStorage.getItem(USER_UUID_KEY) || "");
+  const [userUuidError, setUserUuidError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const failedDetailsRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef(false);
@@ -248,6 +253,17 @@ const Runner = () => {
   };
 
   const run = async () => {
+    const normalizedUserUuid = userUuid.trim();
+    if (!normalizedUserUuid) {
+      setUserUuidError("Please provide the user UUID.");
+      return;
+    }
+    if (!USER_UUID_PATTERN.test(normalizedUserUuid)) {
+      setUserUuidError("User UUID must be a valid UUID.");
+      return;
+    }
+    setUserUuidError("");
+    localStorage.setItem(USER_UUID_KEY, normalizedUserUuid);
     cancelRef.current = false;
     setRunning(true);
     setDone(false);
@@ -263,7 +279,7 @@ const Runner = () => {
         const row = rows[i];
 
         try {
-          const { status: httpStatus, data } = await sendVas(row.advert, row.promotion);
+          const { status: httpStatus, data } = await sendVas(row.advert, row.promotion, normalizedUserUuid);
           if (httpStatus === 401) {
             cancelRef.current = true;
             alert("Session expired. Please login again.");
@@ -608,6 +624,23 @@ const Runner = () => {
                 <CardTitle className="text-lg font-semibold tracking-tight">Run promotion requests</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center space-y-5 text-center">
+                <div className="w-full space-y-2 text-left">
+                  <Label htmlFor="investment-user-uuid" className="text-xs font-medium text-muted-foreground">
+                    User UUID
+                  </Label>
+                  <Input
+                    id="investment-user-uuid"
+                    value={userUuid}
+                    onChange={(event) => {
+                      setUserUuid(event.target.value.trim());
+                      setUserUuidError("");
+                    }}
+                    disabled={running}
+                    placeholder="9d61d25b-2312-40fd-9c60-01ca80c86711"
+                    className="h-10 rounded-xl border-white/80 bg-white/80 text-xs"
+                  />
+                  {userUuidError && <p className="text-xs text-rose-600">{userUuidError}</p>}
+                </div>
                 <div className="grid w-full grid-cols-3 gap-2">
                   <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
                     <p className="text-[11px] tracking-wide text-muted-foreground">Progress</p>
