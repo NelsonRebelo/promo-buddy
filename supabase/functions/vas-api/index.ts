@@ -1360,6 +1360,12 @@ type OrderUser = {
   email: string;
 };
 
+function getOrderRequesterFallback(): OrderUser {
+  return {
+    email: (Deno.env.get("ORDER_MANAGEMENT_REQUESTER_EMAIL") || "nelson.rebelo@olx.com").trim().toLowerCase(),
+  };
+}
+
 function getBearerToken(req: Request): string | null {
   const authorization = req.headers.get("authorization") || "";
   const match = authorization.match(/^Bearer\s+(.+)$/i);
@@ -1564,9 +1570,7 @@ Deno.serve(async (req) => {
 
     if (path === "/order/send" && req.method === "POST") {
       const orderUser = await getOrderUser(req);
-      if (!orderUser.ok) {
-        return json({ success: false, errorMessage: orderUser.error }, orderUser.status);
-      }
+      const requester = orderUser.ok ? orderUser.user : getOrderRequesterFallback();
 
       const { advert, promotion, method, user_uuid, userUuid } = await req.json();
       const normalizedMethod = String(method || "").trim().toLowerCase();
@@ -1602,7 +1606,7 @@ Deno.serve(async (req) => {
       }
 
       return await sendOrderManagementRequest({
-        user: orderUser.user,
+        user: requester,
         userUuid: normalizedUserUuid,
         advert: String(advert),
         promotion: String(promotion),

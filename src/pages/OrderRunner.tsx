@@ -2,11 +2,19 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -25,12 +33,16 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { sendOrderPromotion } from "@/lib/api";
 
-type CsvRow = { advert: string; promotion: string };
+type OrderKind = "investment" | "offer";
+type OrderMethod = "postpay" | "admin";
+type CsvRow = { advert: string; promotion: string; kind: OrderKind };
 type PromotionOption = { name: string; id: string };
 type Result = {
   advert: string;
   promotion: string;
+  kind: OrderKind;
   success: boolean;
   status: number | string;
   errorMessage?: string;
@@ -69,11 +81,27 @@ const PROMOTION_OPTIONS: PromotionOption[] = [
 const EXPORT_OLX_ID = "49";
 const CONCURRENCY = 5;
 const REQUEST_DELAY_MS = 300;
-const ORDER_FAILURE_MESSAGE = "Order management request was not sent.";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
+function getOrderKindLabel(kind: OrderKind) {
+  return kind === "investment" ? "Investment" : "Offer";
+}
+
+function getOrderMethod(kind: OrderKind): OrderMethod {
+  return kind === "investment" ? "postpay" : "admin";
+}
+
+function parseOrderKind(value: string, fallback: OrderKind): OrderKind | null {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === "investment" || normalized === "postpay") return "investment";
+  if (normalized === "offer" || normalized === "admin") return "offer";
+  return null;
+}
+
+function parseCsv(text: string, defaultKind: OrderKind): { rows: CsvRow[]; error?: string } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) {
     return { rows: [], error: "CSV must have a header row and at least one data row." };
@@ -82,6 +110,7 @@ function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
   const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
   const ai = headers.indexOf("advert");
   const pi = headers.indexOf("promotion");
+  const ti = ["type", "kind", "method"].map((header) => headers.indexOf(header)).find((index) => index !== -1) ?? -1;
 
   if (ai === -1 || pi === -1) {
     return { rows: [], error: "CSV must have 'advert' and 'promotion' headers." };
@@ -92,10 +121,14 @@ function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
     const cols = lines[i].split(",").map((c) => c.trim());
     const advert = cols[ai] || "";
     const promotion = cols[pi] || "";
+    const kind = parseOrderKind(ti === -1 ? "" : cols[ti] || "", defaultKind);
     if (!advert || !promotion) {
       return { rows: [], error: `Row ${i + 1} has empty advert or promotion.` };
     }
-    rows.push({ advert, promotion });
+    if (!kind) {
+      return { rows: [], error: `Row ${i + 1} has an invalid type. Use investment or offer.` };
+    }
+    rows.push({ advert, promotion, kind });
   }
 
   return { rows };
@@ -109,7 +142,9 @@ const OrderRunner = () => {
   const [completed, setCompleted] = useState(0);
   const [results, setResults] = useState<Result[]>([]);
   const [done, setDone] = useState(false);
+  const [userUuid, setUserUuid] = useState("");
   const [manualAdvertsText, setManualAdvertsText] = useState("");
+  const [manualKind, setManualKind] = useState<OrderKind>("offer");
   const [manualPromotionIds, setManualPromotionIds] = useState<string[]>([]);
   const [manualError, setManualError] = useState("");
   const [rowsPage, setRowsPage] = useState(1);
@@ -152,7 +187,7 @@ const OrderRunner = () => {
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const { rows: parsed, error } = parseCsv(ev.target?.result as string);
+      const { rows: parsed, error } = parseCsv(ev.target?.result as string, manualKind);
       if (error) {
         setCsvError(error);
         return;
@@ -183,7 +218,7 @@ const OrderRunner = () => {
     const manualRows: CsvRow[] = [];
     for (const advert of adverts) {
       for (const promotionId of manualPromotionIds) {
-        manualRows.push({ advert, promotion: promotionId });
+        manualRows.push({ advert, promotion: promotionId, kind: manualKind });
       }
     }
 
@@ -217,7 +252,7 @@ const OrderRunner = () => {
   const copyFailedRequests = async () => {
     if (failures.length === 0) return;
     const clipboardText = failures
-      .map((row) => `${row.advert}\t${getPromotionLabel(row.promotion) || row.promotion}`)
+      .map((row) => `${row.advert}\t${getPromotionLabel(row.promotion) || row.promotion}\t${getOrderKindLabel(row.kind)}`)
       .join("\n");
 
     try {
@@ -228,7 +263,22 @@ const OrderRunner = () => {
     }
   };
 
+  const openConfirm = () => {
+    const normalizedUuid = userUuid.trim();
+    if (!normalizedUuid) {
+      setManualError("Please provide the user UUID before running.");
+      return;
+    }
+    if (!UUID_PATTERN.test(normalizedUuid)) {
+      setManualError("User UUID must be a valid UUID.");
+      return;
+    }
+    setManualError("");
+    setConfirmOpen(true);
+  };
+
   const run = async () => {
+    const normalizedUuid = userUuid.trim();
     cancelRef.current = false;
     setRunning(true);
     setDone(false);
@@ -243,11 +293,23 @@ const OrderRunner = () => {
         const i = idx++;
         const row = rows[i];
         await sleep(REQUEST_DELAY_MS);
+        const result = await sendOrderPromotion(
+          row.advert,
+          row.promotion,
+          getOrderMethod(row.kind),
+          normalizedUuid,
+        );
+        const data = result.data || {};
+        const success = data.success === true;
         allResults.push({
           advert: row.advert,
           promotion: row.promotion,
-          success: true,
-          status: "prepared",
+          kind: row.kind,
+          success,
+          status: data.status ?? result.status,
+          errorMessage: success
+            ? undefined
+            : data.errorMessage || data.message || data.error || `HTTP ${result.status}`,
         });
         setCompleted((c) => c + 1);
         setResults([...allResults]);
@@ -317,7 +379,25 @@ const OrderRunner = () => {
                   className="hidden"
                 />
 
-                <div className="flex flex-wrap items-center justify-end gap-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="w-full max-w-xs space-y-2">
+                    <Label htmlFor="order-request-type" className="text-sm font-medium">
+                      Request type
+                    </Label>
+                    <Select value={manualKind} onValueChange={(value) => setManualKind(value as OrderKind)} disabled={running}>
+                      <SelectTrigger id="order-request-type" className="h-10 rounded-xl border-white/80 bg-white/80">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="offer">Offer</SelectItem>
+                        <SelectItem value="investment">Investment</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      New rows will be added as {getOrderKindLabel(manualKind)}.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
                   <Button
                     type="button"
                     variant="outline"
@@ -331,6 +411,7 @@ const OrderRunner = () => {
                   <Button type="button" onClick={addManualRows} disabled={running} className="h-9 rounded-full px-4">
                     Add
                   </Button>
+                  </div>
                 </div>
 
                 {csvError && (
@@ -455,6 +536,7 @@ const OrderRunner = () => {
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
                               <TableHead className="w-14">#</TableHead>
+                              <TableHead>Type</TableHead>
                               <TableHead>Advert</TableHead>
                               <TableHead>Promotion</TableHead>
                             </TableRow>
@@ -465,6 +547,7 @@ const OrderRunner = () => {
                                 <TableCell className="text-muted-foreground">
                                   {(rowsPage - 1) * ROWS_PER_PAGE + i + 1}
                                 </TableCell>
+                                <TableCell>{getOrderKindLabel(r.kind)}</TableCell>
                                 <TableCell>{r.advert}</TableCell>
                                 <TableCell>
                                   {getPromotionLabel(r.promotion) ? (
@@ -521,6 +604,23 @@ const OrderRunner = () => {
                 <CardTitle className="text-lg font-semibold tracking-tight">Run order management rows</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center space-y-5 text-center">
+                <div className="w-full space-y-2 text-left">
+                  <Label htmlFor="order-user-uuid" className="text-sm font-medium">
+                    User UUID
+                  </Label>
+                  <Input
+                    id="order-user-uuid"
+                    value={userUuid}
+                    onChange={(event) => setUserUuid(event.target.value.trim())}
+                    disabled={running}
+                    className="h-10 rounded-xl border-white/80 bg-white/80"
+                    placeholder="9d61d25b-2312-40fd-9c60-01ca80c86711"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Mandatory. This is sent as the order user UUID.
+                  </p>
+                </div>
                 <div className="grid w-full grid-cols-3 gap-2">
                   <div className="rounded-xl border border-white/75 bg-white/75 p-2 text-center">
                     <p className="text-[11px] tracking-wide text-muted-foreground">Progress</p>
@@ -537,7 +637,7 @@ const OrderRunner = () => {
                 </div>
                 <div className="w-full max-w-xs space-y-2">
                   <Button
-                    onClick={() => setConfirmOpen(true)}
+                    onClick={openConfirm}
                     disabled={running || rows.length === 0}
                     className="h-11 w-full rounded-xl text-sm shadow-sm transition-all duration-300 hover:shadow-md"
                   >
@@ -627,6 +727,7 @@ const OrderRunner = () => {
                         <Table>
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
+                              <TableHead className="text-center">Type</TableHead>
                               <TableHead className="text-center">Advert</TableHead>
                               <TableHead className="text-center">Promotion</TableHead>
                               <TableHead className="text-center">Message</TableHead>
@@ -635,10 +736,11 @@ const OrderRunner = () => {
                           <TableBody>
                             {paginatedFailures.map((result, i) => (
                               <TableRow key={`${result.advert}-${result.promotion}-${i}`} className="transition-colors hover:bg-white/70">
+                                <TableCell className="text-center">{getOrderKindLabel(result.kind)}</TableCell>
                                 <TableCell className="text-center">{result.advert}</TableCell>
                                 <TableCell className="text-center">{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
                                 <TableCell className="max-w-sm truncate text-center text-sm text-muted-foreground">
-                                  {ORDER_FAILURE_MESSAGE}
+                                  {result.errorMessage || "Order management request failed."}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -701,7 +803,7 @@ const OrderRunner = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] border border-white/80 bg-white/95 p-6 shadow-2xl">
             <p className="text-center text-base leading-7 text-slate-800">
-              No order management requests will be sent for now. Are you sure?
+              These order management requests will be sent now. Are you sure?
             </p>
             <div className="mt-6 flex justify-center gap-3">
               <Button

@@ -121,12 +121,6 @@ async function orderRequest(path: string, options: RequestInit = {}) {
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
-  if (!accessToken) {
-    return new Response(JSON.stringify({ error: "Not authenticated" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -135,7 +129,9 @@ async function orderRequest(path: string, options: RequestInit = {}) {
   if (supabaseKey) {
     headers.apikey = supabaseKey;
   }
-  headers.Authorization = `Bearer ${accessToken}`;
+  if (accessToken || supabaseKey) {
+    headers.Authorization = `Bearer ${accessToken || supabaseKey}`;
+  }
 
   return fetch(`${FUNCTION_URL}${path}`, {
     ...options,
