@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2, LockKeyhole } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,9 +14,20 @@ type OrderAuthLoginProps = {
   title: string;
   description: string;
   redirectTo: string;
+  footer?: ReactNode;
+  hideBack?: boolean;
+  showLogo?: boolean;
 };
 
-const OrderAuthLogin = ({ eyebrow, title, description, redirectTo }: OrderAuthLoginProps) => {
+const OrderAuthLogin = ({
+  eyebrow,
+  title,
+  description,
+  redirectTo,
+  footer,
+  hideBack = false,
+  showLogo = false,
+}: OrderAuthLoginProps) => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -121,10 +132,14 @@ const OrderAuthLogin = ({ eyebrow, title, description, redirectTo }: OrderAuthLo
 
       <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
         <div className="section-shell flex h-14 items-center justify-between">
-          <Button type="button" variant="ghost" size="sm" className="rounded-full px-3" onClick={handleBack}>
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back
-          </Button>
+          {hideBack ? (
+            <span className="w-[76px]" />
+          ) : (
+            <Button type="button" variant="ghost" size="sm" className="rounded-full px-3" onClick={handleBack}>
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Back
+            </Button>
+          )}
           <span className="text-sm font-semibold tracking-tight">Promo Buddy</span>
           <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{eyebrow}</span>
         </div>
@@ -132,6 +147,13 @@ const OrderAuthLogin = ({ eyebrow, title, description, redirectTo }: OrderAuthLo
 
       <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
         <div className="relative mx-auto w-full max-w-md">
+          {showLogo && (
+            <img
+              src="/promobuddy-home-logo.png"
+              alt="Promo Buddy"
+              className="mx-auto mb-6 h-28 w-auto object-contain"
+            />
+          )}
           <Card className="glass fade-up rounded-3xl border-white/80">
             <CardHeader className="items-center space-y-2 pb-2 text-center">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -220,6 +242,7 @@ const OrderAuthLogin = ({ eyebrow, title, description, redirectTo }: OrderAuthLo
               </form>
             </CardContent>
           </Card>
+          {footer}
         </div>
       </main>
     </div>
