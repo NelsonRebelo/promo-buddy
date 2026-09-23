@@ -28,7 +28,7 @@ const Index = () => {
             className="mx-auto mb-6 h-28 w-auto object-contain"
           />
           <Card className="glass w-full rounded-3xl border-white/80">
-            <CardContent className="flex flex-col items-center justify-center gap-3 pt-8 sm:flex-row sm:gap-4 sm:pt-10">
+            <CardContent className="grid gap-3 pt-8 sm:grid-cols-3 sm:gap-4 sm:pt-10">
               <Button asChild className="h-12 w-full max-w-sm rounded-xl text-sm font-medium shadow-sm">
                 <Link to="/login">Investment promotion</Link>
               </Button>
@@ -38,6 +38,13 @@ const Index = () => {
                 className="h-12 w-full max-w-sm rounded-xl border-white/80 bg-white/70 text-sm"
               >
                 <Link to="/offer-login">Offer promotion</Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="h-12 w-full max-w-sm rounded-xl border-white/80 bg-white/70 text-sm"
+              >
+                <Link to="/order-management">Order Management</Link>
               </Button>
             </CardContent>
           </Card>

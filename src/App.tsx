@@ -10,6 +10,7 @@ import OfferLogin from "./pages/OfferLogin";
 import OfferMfa from "./pages/OfferMfa";
 import OfferRunner from "./pages/OfferRunner";
 import OfferPromotionResult from "./pages/OfferPromotionResult";
+import OrderRunner from "./pages/OrderRunner";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/offer-mfa" element={<OfferMfa />} />
           <Route path="/offer-runner" element={<OfferRunner />} />
           <Route path="/offer-promotion-debug" element={<OfferPromotionResult />} />
+          <Route path="/order-management" element={<OrderRunner />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
