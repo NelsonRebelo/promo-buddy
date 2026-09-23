@@ -1,120 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Textarea } from "@/components/ui/textarea";
-import { offerLoginWithCookie } from "@/lib/api";
+import OrderAuthLogin from "@/components/OrderAuthLogin";
 
-const OfferLogin = () => {
-  const navigate = useNavigate();
-  const [cookieValue, setCookieValue] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    navigate("/", { replace: true });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    const normalizedCookie = cookieValue.trim();
-    if (!normalizedCookie) {
-      setError("Paste the full cookie value.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await offerLoginWithCookie({ cookie: normalizedCookie });
-      if (res.ok) {
-        navigate("/offer-runner", { replace: true });
-      } else {
-        setError(res.detail || res.error || "Offer session cookie is invalid.");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unexpected error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div aria-hidden className="brand-blue-stage pointer-events-none absolute inset-0">
-        <img
-          src="https://media.licdn.com/dms/image/v2/C4D1BAQH4PUv6QKg_Ag/company-background_10000/company-background_10000/0/1591019721058/standvirtual_cover?e=1774620000&v=beta&t=h0xHSH-64Du6zwOfe6CHUOdTQiqF0_xx7Dvb8fEs2ig"
-          alt=""
-          className="h-full w-full scale-105 object-cover blur-md saturate-[1.05]"
-        />
-        <div className="brand-blue-overlay" />
-      </div>
-
-      <header className="border-b border-white/60 bg-white/65 backdrop-blur-xl">
-        <div className="section-shell flex h-14 items-center justify-between">
-          <Button type="button" variant="ghost" size="sm" className="rounded-full px-3" onClick={handleBack}>
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back
-          </Button>
-          <span className="text-sm font-semibold tracking-tight">Promo Buddy</span>
-          <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Offer promotion
-          </span>
-        </div>
-      </header>
-
-      <main className="section-shell relative flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
-        <div className="relative mx-auto w-full max-w-md">
-          <Card className="glass rounded-3xl border-white/80">
-            <CardHeader className="items-center space-y-4 pb-2 text-center">
-              <img src="/olx-group-logo.png" alt="OLX Group" className="h-12 w-auto object-contain" />
-              <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-                Paste the full Standvirtual cookie to continue
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive" className="rounded-2xl">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="offer-cookie" className="text-sm font-medium">
-                    Cookie
-                  </Label>
-                  <Textarea
-                    id="offer-cookie"
-                    value={cookieValue}
-                    onChange={(e) => setCookieValue(e.target.value)}
-                    className="min-h-[170px] rounded-xl bg-white/70 font-mono text-xs"
-                    placeholder="Paste full cookie header value"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="h-11 w-full rounded-xl text-sm font-medium" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Validating cookie...
-                    </>
-                  ) : (
-                    "Use cookie"
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    </div>
-  );
-};
+const OfferLogin = () => (
+  <OrderAuthLogin
+    eyebrow="Offer promotion"
+    title="Login with your OKTA credentials"
+    description="Login with your OLX email to run offer promotion requests."
+    redirectTo="/offer-runner"
+  />
+);
 
 export default OfferLogin;

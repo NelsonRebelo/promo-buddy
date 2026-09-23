@@ -1355,6 +1355,166 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+type OrderMethod = "postpay" | "admin";
+type OrderUser = {
+  email: string;
+  uuid: string;
+};
+
+function getBearerToken(req: Request): string | null {
+  const authorization = req.headers.get("authorization") || "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : null;
+}
+
+async function getOrderUser(req: Request): Promise<
+  | { ok: true; user: OrderUser }
+  | { ok: false; status: number; error: string }
+> {
+  const token = getBearerToken(req);
+  if (!token) {
+    return { ok: false, status: 401, error: "Not authenticated" };
+  }
+
+  const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
+  const email = authData.user?.email?.trim().toLowerCase();
+  if (authError || !email) {
+    return { ok: false, status: 401, error: "Not authenticated" };
+  }
+
+  const { data: match, error: matchError } = await supabaseAdmin
+    .from("order_management_users")
+    .select("email, uuid, enabled")
+    .eq("email", email)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  if (matchError) {
+    return { ok: false, status: 500, error: "Failed to validate access" };
+  }
+
+  if (!match?.uuid) {
+    return { ok: false, status: 403, error: "This email is not allowed to use Promo Buddy." };
+  }
+
+  return { ok: true, user: { email, uuid: String(match.uuid) } };
+}
+
+async function sendOrderManagementRequest(params: {
+  user: OrderUser;
+  advert: string;
+  promotion: string;
+  method: OrderMethod;
+}) {
+  const apiKey = Deno.env.get("ORDER_MANAGEMENT_API_KEY");
+  const endpoint =
+    Deno.env.get("ORDER_MANAGEMENT_API_URL") ||
+    "https://service-m-go-order-management.eks-01.shared.prd.eu-west-1.verticals.olx.org/api/v2/order";
+
+  if (!apiKey) {
+    return json(
+      {
+        success: false,
+        advert: params.advert,
+        promotion: params.promotion,
+        status: 500,
+        errorMessage: "Order management API key is not configured.",
+      },
+      500,
+    );
+  }
+
+  const promotionId = Number(params.promotion);
+  const advertId = Number(params.advert);
+  if (!Number.isSafeInteger(promotionId) || !Number.isSafeInteger(advertId)) {
+    return json(
+      {
+        success: false,
+        advert: params.advert,
+        promotion: params.promotion,
+        status: 400,
+        errorMessage: "Advert and promotion must be numeric IDs.",
+      },
+      400,
+    );
+  }
+
+  const payload = {
+    site_urn: "urn:site:standvirtualcom",
+    user: {
+      uuid: params.user.uuid,
+    },
+    payments: [
+      {
+        method: params.method,
+      },
+    ],
+    products: [
+      {
+        id: promotionId,
+        advert_id: advertId,
+      },
+    ],
+    requester: {
+      source: "ccc",
+      type: "admin",
+      id: `urn:user:${params.user.email}`,
+    },
+  };
+
+  try {
+    const upstreamRes = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "x-site-urn": "urn:site:standvirtualcom",
+        "x-method": "payment_create",
+        "x-platform": "business",
+        "x-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const status = upstreamRes.status;
+    const responseText = await upstreamRes.text().catch(() => "");
+    const success = status === 200 || status === 201 || status === 202;
+    let responseBody: unknown = null;
+    const contentType = upstreamRes.headers.get("content-type") || "";
+    if (responseText && contentType.includes("application/json")) {
+      try {
+        responseBody = JSON.parse(responseText);
+      } catch {
+        responseBody = null;
+      }
+    }
+
+    return json(
+      {
+        success,
+        advert: params.advert,
+        promotion: params.promotion,
+        status,
+        method: params.method,
+        message: success
+          ? "Order management request completed successfully."
+          : responseText.substring(0, 500) || `HTTP ${status}`,
+        errorMessage: success ? undefined : responseText.substring(0, 500) || `HTTP ${status}`,
+        response: responseBody,
+      },
+      success ? 200 : status >= 400 ? status : 502,
+    );
+  } catch (err) {
+    return json({
+      success: false,
+      advert: params.advert,
+      promotion: params.promotion,
+      status: "network error",
+      method: params.method,
+      errorMessage: err instanceof Error ? err.message : "Network error",
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1364,6 +1524,55 @@ Deno.serve(async (req) => {
   const path = url.pathname.replace(/^\/vas-api/, "");
 
   try {
+    if (path === "/order/status" && req.method === "GET") {
+      const orderUser = await getOrderUser(req);
+      if (!orderUser.ok) {
+        return json({ loggedIn: false, allowed: false, error: orderUser.error }, orderUser.status);
+      }
+
+      return json({
+        loggedIn: true,
+        allowed: true,
+        email: orderUser.user.email,
+      });
+    }
+
+    if (path === "/order/send" && req.method === "POST") {
+      const orderUser = await getOrderUser(req);
+      if (!orderUser.ok) {
+        return json({ success: false, errorMessage: orderUser.error }, orderUser.status);
+      }
+
+      const { advert, promotion, method } = await req.json();
+      const normalizedMethod = String(method || "").trim().toLowerCase();
+      if (normalizedMethod !== "postpay" && normalizedMethod !== "admin") {
+        return json({
+          success: false,
+          advert,
+          promotion,
+          status: 400,
+          errorMessage: "Invalid order method.",
+        }, 400);
+      }
+
+      if (!advert || !promotion) {
+        return json({
+          success: false,
+          advert,
+          promotion,
+          status: 400,
+          errorMessage: "Missing advert or promotion",
+        }, 400);
+      }
+
+      return await sendOrderManagementRequest({
+        user: orderUser.user,
+        advert: String(advert),
+        promotion: String(promotion),
+        method: normalizedMethod,
+      });
+    }
+
     if (path === "/offer/manual-cookie" && req.method === "POST") {
       const { cookie } = await req.json();
       const cookieHeader = typeof cookie === "string" ? cookie.trim() : "";

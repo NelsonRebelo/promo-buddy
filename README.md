@@ -17,6 +17,21 @@ The app calls the Supabase Edge Function at `/functions/v1/vas-api`, so producti
 - required Supabase server secrets configured for that function
 - database migration applied
 
+Required Supabase function secrets:
+
+- `ORDER_MANAGEMENT_API_KEY`
+
+Optional Supabase function secrets:
+
+- `ORDER_MANAGEMENT_API_URL`
+
+Order Management access is controlled by `public.order_management_users`.
+Add one row per allowed user with:
+
+- `email`
+- `uuid`
+- `enabled = true`
+
 ## Local run
 
 ```bash

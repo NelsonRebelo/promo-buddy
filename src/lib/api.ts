@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vas-api`;
 const SESSION_KEY = "vas_session_id";
 const OFFER_SESSION_KEY = "offer_session_id";
@@ -115,6 +117,48 @@ async function offerRequest(path: string, options: RequestInit = {}) {
   });
 }
 
+async function orderRequest(path: string, options: RequestInit = {}) {
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!accessToken) {
+    return new Response(JSON.stringify({ error: "Not authenticated" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  if (supabaseKey) {
+    headers.apikey = supabaseKey;
+  }
+  headers.Authorization = `Bearer ${accessToken}`;
+
+  return fetch(`${FUNCTION_URL}${path}`, {
+    ...options,
+    headers,
+  });
+}
+
+export async function getOrderStatus() {
+  const res = await orderRequest("/order/status", { method: "GET" });
+  if (!res.ok) {
+    return { loggedIn: false, allowed: false, ...(await res.json().catch(() => ({}))) };
+  }
+  return res.json();
+}
+
+export async function sendOrderPromotion(advert: string, promotion: string, method: "postpay" | "admin") {
+  const res = await orderRequest("/order/send", {
+    method: "POST",
+    body: JSON.stringify({ advert, promotion, method }),
+  });
+  return { status: res.status, data: await res.json() };
+}
+
 export async function login(data: { username: string; password: string }) {
   const res = await request("/login", {
     method: "POST",
@@ -140,20 +184,16 @@ export async function logout() {
   const res = await request("/logout", { method: "POST" });
   clearSessionId();
   clearAuthEmail();
+  await supabase.auth.signOut();
   return res.json();
 }
 
 export async function getStatus() {
-  const res = await request("/status", { method: "GET" });
-  return res.json();
+  return getOrderStatus();
 }
 
 export async function sendVas(advert: string, promotion: string) {
-  const res = await request("/vas/send", {
-    method: "POST",
-    body: JSON.stringify({ advert, promotion }),
-  });
-  return { status: res.status, data: await res.json() };
+  return sendOrderPromotion(advert, promotion, "postpay");
 }
 
 export async function offerLogin(data: { username: string; password: string }) {
@@ -235,20 +275,16 @@ export async function offerVerifyMfa(data: {
 }
 
 export async function getOfferStatus() {
-  const res = await offerRequest("/offer/status", { method: "GET" });
-  return res.json();
+  return getOrderStatus();
 }
 
 export async function sendOfferPromotion(advert: string, promotion: string) {
-  const res = await offerRequest("/offer/send", {
-    method: "POST",
-    body: JSON.stringify({ advert, promotion }),
-  });
-  return { status: res.status, data: await res.json() };
+  return sendOrderPromotion(advert, promotion, "admin");
 }
 
-export function clearOfferSession() {
+export async function clearOfferSession() {
   clearOfferSessionId();
   clearOfferMfaChallenge();
   clearAuthEmail();
+  await supabase.auth.signOut();
 }
