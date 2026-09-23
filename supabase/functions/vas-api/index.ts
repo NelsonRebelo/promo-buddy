@@ -1475,28 +1475,40 @@ async function sendOrderManagementRequest(params: {
 
     const status = upstreamRes.status;
     const responseText = await upstreamRes.text().catch(() => "");
-    const success = status === 200 || status === 201 || status === 202;
     let responseBody: unknown = null;
-    const contentType = upstreamRes.headers.get("content-type") || "";
-    if (responseText && contentType.includes("application/json")) {
+    if (responseText) {
       try {
         responseBody = JSON.parse(responseText);
       } catch {
         responseBody = null;
       }
     }
+    const responseRecord = asRecord(responseBody);
+    const metaRecord = asRecord(responseRecord?.meta);
+    const errorRecord = asRecord(responseRecord?.error);
+    const apiStatus = typeof metaRecord?.status_code === "number" ? metaRecord.status_code : status;
+    const validationDetails = asArray(errorRecord?.validation)
+      .map(asRecord)
+      .map((validation) => validation?.detail)
+      .filter((detail): detail is string => typeof detail === "string" && detail.trim().length > 0);
+    const errorDetail =
+      validationDetails.join(" ") ||
+      (typeof errorRecord?.detail === "string" ? errorRecord.detail : "") ||
+      (typeof errorRecord?.title === "string" ? errorRecord.title : "") ||
+      responseText.substring(0, 500) ||
+      `HTTP ${apiStatus}`;
+    const success = apiStatus === 201;
 
     return json(
       {
         success,
         advert: params.advert,
         promotion: params.promotion,
-        status,
+        status: apiStatus,
+        httpStatus: status,
         method: params.method,
-        message: success
-          ? "Order management request completed successfully."
-          : responseText.substring(0, 500) || `HTTP ${status}`,
-        errorMessage: success ? undefined : responseText.substring(0, 500) || `HTTP ${status}`,
+        message: success ? "Order management request completed successfully." : errorDetail,
+        errorMessage: success ? undefined : errorDetail,
         response: responseBody,
       },
       success ? 200 : status >= 400 ? status : 502,

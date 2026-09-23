@@ -73,8 +73,6 @@ const CONCURRENCY = 5;
 const REQUEST_DELAY_MS = 300;
 const USER_UUID_KEY = "promo_buddy_manual_user_uuid";
 const USER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const OFFER_FAILURE_MESSAGE = "Unable to apply VAS";
-
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
@@ -706,7 +704,7 @@ const OfferRunner = () => {
                                 <TableCell className="text-center">{result.advert}</TableCell>
                                 <TableCell className="text-center">{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
                                 <TableCell className="max-w-sm truncate text-center text-sm text-muted-foreground">
-                                  {OFFER_FAILURE_MESSAGE}
+                                  {result.errorMessage || "Unable to apply VAS"}
                                 </TableCell>
                               </TableRow>
                             ))}
