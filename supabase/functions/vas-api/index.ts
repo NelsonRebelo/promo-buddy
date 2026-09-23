@@ -1381,6 +1381,21 @@ async function getOrderUser(req: Request): Promise<
     return { ok: false, status: 401, error: "Not authenticated" };
   }
 
+  const { data: allowedUser, error: allowedUserError } = await supabaseAdmin
+    .from("promo_buddy_allowed_users")
+    .select("email, enabled")
+    .eq("email", email)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  if (allowedUserError) {
+    return { ok: false, status: 500, error: "Failed to validate access" };
+  }
+
+  if (!allowedUser) {
+    return { ok: false, status: 403, error: "This email is not allowed to use Promo Buddy." };
+  }
+
   return { ok: true, user: { email } };
 }
 

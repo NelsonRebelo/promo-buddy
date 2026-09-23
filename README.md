@@ -27,6 +27,12 @@ Optional Supabase function secrets:
 
 The user UUID is entered manually in the runner screens for now.
 
+Promo Buddy login access is controlled by `public.promo_buddy_allowed_users`.
+Add one row per allowed user with:
+
+- `email`
+- `enabled = true`
+
 ## Local run
 
 ```bash
