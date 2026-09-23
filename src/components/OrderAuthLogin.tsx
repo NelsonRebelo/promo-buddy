@@ -30,8 +30,6 @@ const OrderAuthLogin = ({
 }: OrderAuthLoginProps) => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [message, setMessage] = useState("");
@@ -66,39 +64,11 @@ const OrderAuthLogin = ({
     }
 
     setLoading(true);
-    if (codeSent) {
-      const normalizedCode = code.trim();
-      if (!normalizedCode) {
-        setError("Enter the code from your email.");
-        setLoading(false);
-        return;
-      }
-
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email: normalizedEmail,
-        token: normalizedCode,
-        type: "email",
-      });
-      if (verifyError) {
-        setLoading(false);
-        setError(verifyError.message);
-        return;
-      }
-
-      const status = await getOrderStatus();
-      setLoading(false);
-      if (status.loggedIn && status.allowed) {
-        navigate(redirectTo, { replace: true });
-        return;
-      }
-
-      await supabase.auth.signOut();
-      setError(status.error || "This email is not allowed to use Promo Buddy.");
-      return;
-    }
-
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
     });
     setLoading(false);
 
@@ -107,8 +77,7 @@ const OrderAuthLogin = ({
       return;
     }
 
-    setCodeSent(true);
-    setMessage("Check your email and enter the login code to continue.");
+    setMessage("Check your email and open the login link to continue.");
   };
 
   if (checking) {
@@ -185,28 +154,11 @@ const OrderAuthLogin = ({
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    disabled={codeSent}
                     className="h-11 rounded-xl bg-white/70 transition-shadow duration-300 focus-visible:ring-2"
                     placeholder="name@olx.com"
                     required
                   />
                 </div>
-                {codeSent && (
-                  <div className="space-y-2">
-                    <Label htmlFor="code" className="text-sm font-medium">
-                      Login code
-                    </Label>
-                    <Input
-                      id="code"
-                      value={code}
-                      onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
-                      className="h-11 rounded-xl bg-white/70 text-center tracking-[0.35em] transition-shadow duration-300 focus-visible:ring-2"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      required
-                    />
-                  </div>
-                )}
                 <Button
                   type="submit"
                   className="h-11 w-full rounded-xl text-sm font-medium shadow-sm transition-all duration-300 hover:shadow-md"
@@ -215,30 +167,12 @@ const OrderAuthLogin = ({
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {codeSent ? "Checking code..." : "Sending code..."}
+                      Sending login link...
                     </>
-                  ) : codeSent ? (
-                    "Verify code"
                   ) : (
-                    "Send login code"
+                    "Send login link"
                   )}
                 </Button>
-                {codeSent && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-9 w-full rounded-xl text-sm"
-                    disabled={loading}
-                    onClick={() => {
-                      setCode("");
-                      setCodeSent(false);
-                      setMessage("");
-                      setError("");
-                    }}
-                  >
-                    Use another email
-                  </Button>
-                )}
               </form>
             </CardContent>
           </Card>
