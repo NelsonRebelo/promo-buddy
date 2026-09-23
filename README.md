@@ -9,6 +9,7 @@ Required frontend variables:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_APP_URL`
 
 The app calls the Supabase Edge Function at `/functions/v1/vas-api`, so production also depends on:
 

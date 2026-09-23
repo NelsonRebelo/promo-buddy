@@ -67,7 +67,7 @@ const OrderAuthLogin = ({
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: import.meta.env.VITE_APP_URL || window.location.origin,
       },
     });
     setLoading(false);
