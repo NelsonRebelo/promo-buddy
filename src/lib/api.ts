@@ -155,30 +155,173 @@ export async function getOrderStatus() {
   return res.json();
 }
 
+type OrderMethod = "postpay" | "admin";
+
+type OrderRequestDebug = {
+  url: string;
+  method: "POST";
+  headers: Record<string, string>;
+  payload: unknown;
+};
+
+function getOrderRequesterEmail() {
+  return (import.meta.env.VITE_ORDER_MANAGEMENT_REQUESTER_EMAIL || "nelson.rebelo@olx.com").trim().toLowerCase();
+}
+
+function getOrderManagementUrl() {
+  return (
+    import.meta.env.VITE_ORDER_MANAGEMENT_API_URL ||
+    "https://service-m-go-order-management.eks-01.shared.prd.eu-west-1.verticals.olx.org/api/v2/order"
+  );
+}
+
+function getOrderErrorDetail(responseBody: unknown, fallback: string) {
+  if (!responseBody || typeof responseBody !== "object") return fallback;
+  const body = responseBody as { error?: { detail?: unknown; title?: unknown; validation?: unknown } };
+  const validation = Array.isArray(body.error?.validation) ? body.error.validation : [];
+  const validationDetails = validation
+    .map((entry) => (entry && typeof entry === "object" ? (entry as { detail?: unknown }).detail : null))
+    .filter((detail): detail is string => typeof detail === "string" && detail.trim().length > 0);
+
+  return (
+    validationDetails.join(" ") ||
+    (typeof body.error?.detail === "string" ? body.error.detail : "") ||
+    (typeof body.error?.title === "string" ? body.error.title : "") ||
+    fallback
+  );
+}
+
 export async function sendOrderPromotion(
   advert: string,
   promotion: string,
-  method: "postpay" | "admin",
+  method: OrderMethod,
   userUuid: string,
+  apiKey?: string,
 ) {
-  try {
-    const res = await orderRequest("/order/send", {
-      method: "POST",
-      body: JSON.stringify({ advert, promotion, method, user_uuid: userUuid }),
-    });
-    return { status: res.status, data: await res.json().catch(() => ({ errorMessage: "Invalid response from order management." })) };
-  } catch (error) {
+  const endpoint = getOrderManagementUrl();
+  const normalizedApiKey = (apiKey || import.meta.env.VITE_ORDER_MANAGEMENT_API_KEY || "").trim();
+  const promotionId = Number(promotion);
+  const advertId = Number(advert);
+  const payload = {
+    site_urn: "urn:site:standvirtualcom",
+    user: {
+      uuid: userUuid.trim(),
+    },
+    payments: [
+      {
+        method,
+      },
+    ],
+    products: [
+      {
+        id: promotionId,
+        advert_id: advertId,
+      },
+    ],
+    requester: {
+      source: "ccc",
+      type: "admin",
+      id: `urn:user:${getOrderRequesterEmail()}`,
+    },
+  };
+  const requestDebug: OrderRequestDebug = {
+    url: endpoint,
+    method: "POST",
+    headers: {
+      "x-site-urn": "urn:site:standvirtualcom",
+      "x-method": "payment_create",
+      "x-platform": "business",
+      "x-api-key": "[redacted]",
+      "Content-Type": "application/json",
+    },
+    payload,
+  };
+
+  if (!normalizedApiKey) {
     return {
-      status: "network error",
+      status: 400,
       data: {
         success: false,
-        errorMessage: error instanceof Error && error.name === "AbortError"
-          ? "Order management request timed out."
-          : error instanceof Error
-            ? error.message
-            : "Network error",
+        status: 400,
+        errorMessage: "Order Management API key is required.",
+        requestDebug,
       },
     };
+  }
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), ORDER_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "x-site-urn": "urn:site:standvirtualcom",
+        "x-method": "payment_create",
+        "x-platform": "business",
+        "x-api-key": normalizedApiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseText = await response.text().catch(() => "");
+    let responseBody: unknown = null;
+    if (responseText) {
+      try {
+        responseBody = JSON.parse(responseText);
+      } catch {
+        responseBody = null;
+      }
+    }
+
+    const metaStatus = responseBody && typeof responseBody === "object"
+      ? (responseBody as { meta?: { status_code?: unknown } }).meta?.status_code
+      : undefined;
+    const apiStatus = typeof metaStatus === "number" ? metaStatus : response.status;
+    const success = apiStatus === 201;
+    const errorMessage = success
+      ? undefined
+      : getOrderErrorDetail(responseBody, responseText.substring(0, 500) || `HTTP ${apiStatus}`);
+
+    return {
+      status: response.status,
+      data: {
+        success,
+        advert,
+        promotion,
+        status: apiStatus,
+        httpStatus: response.status,
+        method,
+        message: success ? "Order management request completed successfully." : errorMessage,
+        errorMessage,
+        requestDebug,
+        response: responseBody,
+      },
+    };
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError";
+    return {
+      status: timedOut ? "timeout" : "network error",
+      data: {
+        success: false,
+        advert,
+        promotion,
+        status: timedOut ? "timeout" : "network error",
+        method,
+        errorMessage: timedOut
+          ? "Order management request timed out from the browser."
+          : error instanceof TypeError
+            ? "Browser request failed. This is usually CORS, VPN, or network access."
+            : error instanceof Error
+              ? error.message
+              : "Network error",
+        requestDebug,
+      },
+    };
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 

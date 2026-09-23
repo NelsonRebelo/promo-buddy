@@ -144,6 +144,7 @@ const OrderRunner = () => {
   const [results, setResults] = useState<Result[]>([]);
   const [done, setDone] = useState(false);
   const [userUuid, setUserUuid] = useState("");
+  const [orderApiKey, setOrderApiKey] = useState("");
   const [manualAdvertsText, setManualAdvertsText] = useState("");
   const [manualKind, setManualKind] = useState<OrderKind>("offer");
   const [manualPromotionIds, setManualPromotionIds] = useState<string[]>([]);
@@ -290,6 +291,10 @@ const OrderRunner = () => {
       setManualError("User UUID must be a valid UUID.");
       return;
     }
+    if (!orderApiKey.trim() && !import.meta.env.VITE_ORDER_MANAGEMENT_API_KEY) {
+      setManualError("Please provide the Order Management API key before running.");
+      return;
+    }
     setManualError("");
     setConfirmOpen(true);
   };
@@ -316,6 +321,7 @@ const OrderRunner = () => {
             row.promotion,
             getOrderMethod(row.kind),
             normalizedUuid,
+            orderApiKey,
           );
           const data = result.data || {};
           const success = data.success === true;
@@ -652,6 +658,23 @@ const OrderRunner = () => {
                   />
                   <p className="text-xs text-muted-foreground">
                     Mandatory. This is sent as the order user UUID.
+                  </p>
+                </div>
+                <div className="w-full space-y-2 text-left">
+                  <Label htmlFor="order-api-key" className="text-sm font-medium">
+                    Order Management API key
+                  </Label>
+                  <Input
+                    id="order-api-key"
+                    type="password"
+                    value={orderApiKey}
+                    onChange={(event) => setOrderApiKey(event.target.value.trim())}
+                    disabled={running}
+                    className="h-10 rounded-xl border-white/80 bg-white/80"
+                    placeholder="Paste API key"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Used only in this browser session. Not needed if configured in Vercel.
                   </p>
                 </div>
                 <div className="grid w-full grid-cols-3 gap-2">
