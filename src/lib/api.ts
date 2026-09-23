@@ -164,6 +164,10 @@ export async function sendOrderPromotion(
   return { status: res.status, data: await res.json() };
 }
 
+export async function logoutOrderManagement() {
+  await supabase.auth.signOut();
+}
+
 export async function login(data: { username: string; password: string }) {
   const res = await request("/login", {
     method: "POST",
@@ -189,16 +193,20 @@ export async function logout() {
   const res = await request("/logout", { method: "POST" });
   clearSessionId();
   clearAuthEmail();
-  await supabase.auth.signOut();
   return res.json();
 }
 
 export async function getStatus() {
-  return getOrderStatus();
+  const res = await request("/status", { method: "GET" });
+  return res.json();
 }
 
-export async function sendVas(advert: string, promotion: string, userUuid: string) {
-  return sendOrderPromotion(advert, promotion, "postpay", userUuid);
+export async function sendVas(advert: string, promotion: string) {
+  const res = await request("/vas/send", {
+    method: "POST",
+    body: JSON.stringify({ advert, promotion }),
+  });
+  return { status: res.status, data: await res.json() };
 }
 
 export async function offerLogin(data: { username: string; password: string }) {
@@ -280,16 +288,20 @@ export async function offerVerifyMfa(data: {
 }
 
 export async function getOfferStatus() {
-  return getOrderStatus();
+  const res = await offerRequest("/offer/status", { method: "GET" });
+  return res.json();
 }
 
-export async function sendOfferPromotion(advert: string, promotion: string, userUuid: string) {
-  return sendOrderPromotion(advert, promotion, "admin", userUuid);
+export async function sendOfferPromotion(advert: string, promotion: string) {
+  const res = await offerRequest("/offer/send", {
+    method: "POST",
+    body: JSON.stringify({ advert, promotion }),
+  });
+  return { status: res.status, data: await res.json() };
 }
 
-export async function clearOfferSession() {
+export function clearOfferSession() {
   clearOfferSessionId();
   clearOfferMfaChallenge();
   clearAuthEmail();
-  await supabase.auth.signOut();
 }
