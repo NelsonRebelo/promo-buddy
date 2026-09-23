@@ -292,34 +292,49 @@ const OrderRunner = () => {
       while (idx < rows.length && !cancelRef.current) {
         const i = idx++;
         const row = rows[i];
-        await sleep(REQUEST_DELAY_MS);
-        const result = await sendOrderPromotion(
-          row.advert,
-          row.promotion,
-          getOrderMethod(row.kind),
-          normalizedUuid,
-        );
-        const data = result.data || {};
-        const success = data.success === true;
-        allResults.push({
-          advert: row.advert,
-          promotion: row.promotion,
-          kind: row.kind,
-          success,
-          status: data.status ?? result.status,
-          errorMessage: success
-            ? undefined
-            : data.errorMessage || data.message || data.error || `HTTP ${result.status}`,
-        });
-        setCompleted((c) => c + 1);
-        setResults([...allResults]);
+        try {
+          await sleep(REQUEST_DELAY_MS);
+          const result = await sendOrderPromotion(
+            row.advert,
+            row.promotion,
+            getOrderMethod(row.kind),
+            normalizedUuid,
+          );
+          const data = result.data || {};
+          const success = data.success === true;
+          allResults.push({
+            advert: row.advert,
+            promotion: row.promotion,
+            kind: row.kind,
+            success,
+            status: data.status ?? result.status,
+            errorMessage: success
+              ? undefined
+              : data.errorMessage || data.message || data.error || `HTTP ${result.status}`,
+          });
+        } catch (error) {
+          allResults.push({
+            advert: row.advert,
+            promotion: row.promotion,
+            kind: row.kind,
+            success: false,
+            status: "network error",
+            errorMessage: error instanceof Error ? error.message : "Network error",
+          });
+        } finally {
+          setCompleted((c) => c + 1);
+          setResults([...allResults]);
+        }
       }
     };
 
     const workers = Array.from({ length: Math.min(CONCURRENCY, rows.length) }, () => worker());
-    await Promise.all(workers);
-    setRunning(false);
-    setDone(true);
+    try {
+      await Promise.allSettled(workers);
+    } finally {
+      setRunning(false);
+      setDone(true);
+    }
   };
 
   const handleExit = () => {

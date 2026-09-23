@@ -5,6 +5,7 @@ const SESSION_KEY = "vas_session_id";
 const OFFER_SESSION_KEY = "offer_session_id";
 const OFFER_MFA_KEY = "offer_mfa_challenge";
 const AUTH_EMAIL_KEY = "promo_buddy_auth_email";
+const ORDER_REQUEST_TIMEOUT_MS = 30000;
 
 function setAuthEmail(email: string) {
   localStorage.setItem(AUTH_EMAIL_KEY, email.trim().toLowerCase());
@@ -121,6 +122,8 @@ async function orderRequest(path: string, options: RequestInit = {}) {
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), ORDER_REQUEST_TIMEOUT_MS);
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -133,10 +136,15 @@ async function orderRequest(path: string, options: RequestInit = {}) {
     headers.Authorization = `Bearer ${accessToken || supabaseKey}`;
   }
 
-  return fetch(`${FUNCTION_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  try {
+    return await fetch(`${FUNCTION_URL}${path}`, {
+      ...options,
+      headers,
+      signal: options.signal ?? controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 export async function getOrderStatus() {
@@ -153,11 +161,25 @@ export async function sendOrderPromotion(
   method: "postpay" | "admin",
   userUuid: string,
 ) {
-  const res = await orderRequest("/order/send", {
-    method: "POST",
-    body: JSON.stringify({ advert, promotion, method, user_uuid: userUuid }),
-  });
-  return { status: res.status, data: await res.json() };
+  try {
+    const res = await orderRequest("/order/send", {
+      method: "POST",
+      body: JSON.stringify({ advert, promotion, method, user_uuid: userUuid }),
+    });
+    return { status: res.status, data: await res.json().catch(() => ({ errorMessage: "Invalid response from order management." })) };
+  } catch (error) {
+    return {
+      status: "network error",
+      data: {
+        success: false,
+        errorMessage: error instanceof Error && error.name === "AbortError"
+          ? "Order management request timed out."
+          : error instanceof Error
+            ? error.message
+            : "Network error",
+      },
+    };
+  }
 }
 
 export async function logoutOrderManagement() {
