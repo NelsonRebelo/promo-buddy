@@ -1360,6 +1360,8 @@ type OrderUser = {
   email: string;
 };
 
+const ORDER_MANAGEMENT_UPSTREAM_TIMEOUT_MS = 12000;
+
 function getOrderRequesterFallback(): OrderUser {
   return {
     email: (Deno.env.get("ORDER_MANAGEMENT_REQUESTER_EMAIL") || "nelson.rebelo@olx.com").trim().toLowerCase(),
@@ -1480,10 +1482,26 @@ async function sendOrderManagementRequest(params: {
       id: `urn:user:${params.user.email}`,
     },
   };
+  const requestDebug = {
+    url: endpoint,
+    method: "POST",
+    headers: {
+      "x-site-urn": "urn:site:standvirtualcom",
+      "x-method": "payment_create",
+      "x-platform": "business",
+      "x-api-key": "[redacted]",
+      "Content-Type": "application/json",
+    },
+    payload,
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ORDER_MANAGEMENT_UPSTREAM_TIMEOUT_MS);
 
   try {
     const upstreamRes = await fetch(endpoint, {
       method: "POST",
+      signal: controller.signal,
       headers: {
         "x-site-urn": "urn:site:standvirtualcom",
         "x-method": "payment_create",
@@ -1530,19 +1548,28 @@ async function sendOrderManagementRequest(params: {
         method: params.method,
         message: success ? "Order management request completed successfully." : errorDetail,
         errorMessage: success ? undefined : errorDetail,
+        requestDebug,
         response: responseBody,
       },
       success ? 200 : status >= 400 ? status : 502,
     );
   } catch (err) {
+    const timedOut = err instanceof Error && err.name === "AbortError";
     return json({
       success: false,
       advert: params.advert,
       promotion: params.promotion,
-      status: "network error",
+      status: timedOut ? "timeout" : "network error",
       method: params.method,
-      errorMessage: err instanceof Error ? err.message : "Network error",
+      requestDebug,
+      errorMessage: timedOut
+        ? "Order Management API did not respond from Supabase. The endpoint may only be reachable from the OLX network."
+        : err instanceof Error
+          ? err.message
+          : "Network error",
     });
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -46,6 +46,7 @@ type Result = {
   success: boolean;
   status: number | string;
   errorMessage?: string;
+  requestDebug?: unknown;
 };
 
 const PROMOTION_OPTIONS: PromotionOption[] = [
@@ -150,6 +151,7 @@ const OrderRunner = () => {
   const [rowsPage, setRowsPage] = useState(1);
   const [failuresPage, setFailuresPage] = useState(1);
   const [copyingFailures, setCopyingFailures] = useState(false);
+  const [copiedDebugKey, setCopiedDebugKey] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const preparedRef = useRef<HTMLDivElement>(null);
@@ -263,6 +265,21 @@ const OrderRunner = () => {
     }
   };
 
+  const copyRequestDebug = async (result: Result) => {
+    const key = `${result.kind}-${result.advert}-${result.promotion}`;
+    const debug = result.requestDebug || {
+      advert: result.advert,
+      promotion: result.promotion,
+      type: getOrderKindLabel(result.kind),
+      method: getOrderMethod(result.kind),
+      message: result.errorMessage || "No request debug was returned.",
+    };
+
+    await navigator.clipboard.writeText(JSON.stringify(debug, null, 2));
+    setCopiedDebugKey(key);
+    window.setTimeout(() => setCopiedDebugKey(""), 1200);
+  };
+
   const openConfirm = () => {
     const normalizedUuid = userUuid.trim();
     if (!normalizedUuid) {
@@ -311,6 +328,7 @@ const OrderRunner = () => {
             errorMessage: success
               ? undefined
               : data.errorMessage || data.message || data.error || `HTTP ${result.status}`,
+            requestDebug: data.requestDebug,
           });
         } catch (error) {
           allResults.push({
@@ -746,19 +764,35 @@ const OrderRunner = () => {
                               <TableHead className="text-center">Advert</TableHead>
                               <TableHead className="text-center">Promotion</TableHead>
                               <TableHead className="text-center">Message</TableHead>
+                              <TableHead className="text-center">Debug</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {paginatedFailures.map((result, i) => (
-                              <TableRow key={`${result.advert}-${result.promotion}-${i}`} className="transition-colors hover:bg-white/70">
-                                <TableCell className="text-center">{getOrderKindLabel(result.kind)}</TableCell>
-                                <TableCell className="text-center">{result.advert}</TableCell>
-                                <TableCell className="text-center">{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
-                                <TableCell className="max-w-sm truncate text-center text-sm text-muted-foreground">
-                                  {result.errorMessage || "Order management request failed."}
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {paginatedFailures.map((result, i) => {
+                              const debugKey = `${result.kind}-${result.advert}-${result.promotion}`;
+                              return (
+                                <TableRow key={`${result.advert}-${result.promotion}-${i}`} className="transition-colors hover:bg-white/70">
+                                  <TableCell className="text-center">{getOrderKindLabel(result.kind)}</TableCell>
+                                  <TableCell className="text-center">{result.advert}</TableCell>
+                                  <TableCell className="text-center">{getPromotionLabel(result.promotion) || result.promotion}</TableCell>
+                                  <TableCell className="max-w-sm truncate text-center text-sm text-muted-foreground">
+                                    {result.errorMessage || "Order management request failed."}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => void copyRequestDebug(result)}
+                                      className="rounded-full border-white/80 bg-white/70 text-xs"
+                                    >
+                                      <Copy className="mr-1.5 h-3.5 w-3.5" />
+                                      {copiedDebugKey === debugKey ? "Copied" : "Copy"}
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
